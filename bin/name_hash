@@ -171,7 +171,7 @@ add_checksum() {
   check_algorithm "${algorithm}"
   checksum=$(${!algorithm} "${in_file}" | awk '{print $1}')
   (( $? != 0 )) && abort "Fatal error, see '${LOG_FILE}'."
-  new_file="${in_file%.*}_${checksum}.${in_file##*.}"
+  new_file="${in_file%.*}_${algorithm}_${checksum}.${in_file##*.}"
   if ! mv "${in_file}" "${new_file}"; then
     abort "Fatal error, see '${LOG_FILE}'."
   fi
@@ -254,6 +254,10 @@ remove_checksum() {
 
   for algo in {xxh128,sha1,sha256,sha512,xxh32,xxh64}; do
     hash_length=$(${!algo} <(echo) | awk '{print $1}' | awk '{print length}')
+    echo $hash_length
+    algo_lenght=${#algo}
+    full_lenght=`expr $algo_lenght + $hash_lenght`
+    echo $full_lenght
     (( $? != 0 )) && abort "Fatal error, see '${LOG_FILE}'."
     if echo "${in_file}" \
       | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." &> /dev/null
@@ -261,7 +265,8 @@ remove_checksum() {
       checksum="$(echo "${in_file}" \
         | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." \
         | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}")"
-      new_file="${in_file/"$checksum"/}"
+      echo $checksum
+      new_file="${in_file/"$algo_$checksum"/}"
       if ! mv "${in_file}" "${new_file}"; then
         abort "Fatal error, see '${LOG_FILE}'."
       fi
