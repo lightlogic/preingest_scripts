@@ -1,0 +1,184 @@
+Change Log
+==========
+
+All notable changes to Bash AVpres are documented in this file.
+
+2022-08-13
+  Added
+  - update_manifest: script and man page
+  - make_bagit, verify_bagit and undo_bagit: xxHash 128, 64 and 32, and CRC-32
+    support (this is outside the RFC 8493 specifications)
+  - ffmpeg_head: value 'source_folder'
+  Changed
+  - make_bagit, make_manifest, verify_bagit and verify_manifest: allow file
+    exclusion list
+  - help and advanced options messages "design"
+  - Bash 3.2 or later is preferred
+
+2021-12-18
+  Fixed
+  - verify_manifest: handling of different manifest filename naming schemata
+
+2021-11-06
+  Fixed
+  - make_bagit and verify_bagit: Payload-Oxum computing on any OS
+
+2021-08-28
+  Fixed
+  - make_ffv1, make_framemd5, make_h264, make_prores, missing_files and
+    verify_framemd5: more stringent regex
+
+2021-07-03
+  Added
+  - verify_bagit and undo_bagit: -b is an alias of -i (user request)
+
+2021-05-08
+  Added
+  - Bash 3.2 or later is required
+  Fixed
+  - make_framemd5 and verify_framemd5: use frame rate of single images when
+    the metadata is defined
+
+2021-01-30
+  Changed
+  - make_bagit and verify_bagit: use md5sum, sha1sum and sha256sum rather than
+    md5deep, sha1deep and sha256deep
+
+2021-01-24
+  Fixed
+  - missing_files: force decimal iteration to avoid using octal numeral system
+    when an interval range starts with two zeroes
+
+2021-01-23
+  Added
+  - alternate default values can be set using configuration files:
+      ${HOME}/.config/AVpres/Bash_AVpres/<script_name>.txt
+  - ffmpeg_head: '--config' option to apply an external configuration file for
+    the compilation
+  - ffmpeg_head: '--patch_only' option to use the already downloaded head
+  - make_bagit and verify_bagit: 'fetch.txt' can be included, but its validity
+    is not verified
+  - undo_bagit: '--force' option to process incomplete BagIt archives
+  - verify_ffv1 and verify_framemd5: man
+  Changed
+  - make_manifest, verity_manifest, make_bagit and verify_bagit: hash algorithm
+    names can be expressed in lower or upper case
+  - make_bagit and verify_bagit: additional items can be included in
+    'bag-info.txt', but their validity is not verified
+
+2020-12-27
+  Added
+  - ffengine_presets: handle 'AVpres', 'ffmprovisr' and other presets (script
+    and man)
+  Removed
+  - engine_ffmprovisr: this command is replaced by the more general
+    ffengine_presets
+
+2020-12-19
+  Added
+  - name_hash: xxHash 128, 64 and 32, and CRC-32 support
+  - make_manifest and verify_manifest: xxHash 128, 64 and 32, and CRC-32
+    support
+  Changed
+  - name_hash: xxHash 128 is now the default rather than MD5
+  - make_manifest and verify_manifest: xxHash 128 is now the default rather
+    than MD5
+
+2020-12-05
+  Added
+  - verify_manifest: man
+
+2020-11-21
+  Changed
+  - man pages
+  - print minimal help exit now with status 0 rather than 1
+
+2020-11-07
+  Changed
+  - structure of package
+
+2020-10-17
+  Changed
+  - make_ffv1, make_h264, make_prores, make_framemd5, verify_ffv1 and
+    verify_framemd5: different FFmpeg implementations can be selected
+  - ffmpeg_head: configuration parameters
+
+2020-10-10
+  Added:
+  - undo_bagit: script and man
+
+2020-10-04
+  Added:
+  - make_bagit: '--with_scripts' option (user request)
+
+2020-09-26
+  Added
+  - make_manifest and make_framemd5: man
+  Changed
+  - engine_ffmprovisr: now retrieve the data from GitHub using 'curl'
+  - make_framemd5 and verify_framemd5: support for single-images formats (user
+    request)
+  Fixed
+  - make_manifest: user reported bug
+
+2020-09-19
+  Added
+  - missing_files: script and man
+
+2020-09-05
+  Changed
+  - make_manifest and verify_manifest: use 'xargs' rather than '-exec {}'
+
+2020-08-25
+  Changed
+  - make_ffv1, make_h264 and make_prores: single-image based files can also
+    have digit-only filenames (user request)
+
+2020-08-23
+  Changed
+  - ffmpeg_head: more patching possibilities
+
+2020-08-16
+  Changed
+  - make_bagit: the default version is now 1.0 and the default algorithm
+    SHA-512, according to RFC 8493
+
+2020-08-13
+  Added
+  - make_manifest and verify_manifest: support for SHA-1, SHA-256 and SHA-512
+
+2020-08-11
+  Added
+  - name_hash: script and man
+
+2020-08-10
+  Added
+  - make_bagit and verify_bagit: support for SHA-1, SHA-256 and SHA-512
+
+2020-08-04
+  Fixed
+  - make_manifest and verify_manifest: user reported bug
+
+2020-08-03
+  Changed
+  - make_bagit and verify_bagit: now slower, but supporting also very high
+    numbers of folders and files
+
+2020-08-02
+  Added
+  - ffmpeg_head: man
+  Changed
+  - ffmpeg_head: apply patches to the source code before compiling
+
+2020-08-01
+  Added
+  - make_ffv1: script and man
+  - verify_ffv1: script
+
+2020-07-30
+  Changed
+  - filename suffixes do not necessary start with an underscore (user request)
+
+2020-07-25
+  Added
+  - first public release

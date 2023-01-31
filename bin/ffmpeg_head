@@ -1,0 +1,348 @@
+#!/usr/bin/env bash
+
+# Install, patch or delete the current FFmpeg HEAD.
+#
+# Copyright (c) 2003-2023 by Reto Kromer <https://reto.ch>
+#
+# This Bash script is released under a 3-Clause BSD License and is provided
+# "as is" without warranty or support of any kind.
+
+
+# initialise constants
+VERSION='2022-12-31'
+SCRIPT_NAME="$(basename "$0")"
+CONFIG_FILE="${HOME}/.config/AVpres/Bash_AVpres/${SCRIPT_NAME}.txt"
+RED='\033[1;31m'
+BLUE='\033[1;34m'
+NC='\033[0m'
+
+# load configuration file if any and initialise default values
+unset config
+[[ -f "${CONFIG_FILE}" ]] && . "${CONFIG_FILE}"
+source_folder="${source_folder:-${HOME}/FFMPEG_HEAD}"
+patch_local="${patch_local:-no}"
+
+# initialise another default value
+os_type="$(uname -s)"
+
+# initialise variable
+unset mode
+
+
+# get date-and-time stamp
+date_time() {
+  TZ='UTC' date +'[%F %T %Z]'
+}
+
+
+# check that Bash 3.2 or later is running
+if ! printf '%s\n%s\n' "$(bash -c 'echo ${BASH_VERSION}')" "3.2" | sort -rVC; then
+  echo -e "${BLUE}Warning: This 'bash' binary is very old. Tested for version 3.2 or later.${NC}"
+fi
+
+# start log file
+[[ -d '/tmp/AVpres' ]] || mkdir -p '/tmp/AVpres'
+LOG_FILE="$(mktemp "/tmp/AVpres/${SCRIPT_NAME}.XXXXXXXXXX")"
+echo "$(date_time) ${SCRIPT_NAME} ${VERSION}" > "${LOG_FILE}"
+echo "$(date_time) $0 $*" >> "${LOG_FILE}"
+echo "$(date_time) START" >> "${LOG_FILE}"
+
+
+# display error message and exit with status 1
+abort() {
+  echo -e "${RED}${1:-An unknown error occurred.\a}${NC}"
+  echo "$(date_time) ${1:-An unknown error occurred.}" >> "${LOG_FILE}"
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 1
+}
+
+
+# check that OS is supported and initialise a compiling option
+if [[ "${os_type}" == "Darwin" ]]; then
+  THREADS="$(sysctl -n hw.ncpu)"
+elif [[ "${os_type}" == "Linux" ]]; then
+  THREADS="$(grep -c ^processor /proc/cpuinfo)"
+else
+  abort "Error: The operating system '${os_type}' is not supported."
+fi
+
+
+# display a minimal help message and exit with status 0
+print_prompt() {
+  echo "$(date_time) print prompt" >> "${LOG_FILE}"
+  cat << EOF
+Help:
+  ${SCRIPT_NAME} -h
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# display the help message and exit with status 0
+print_help() {
+  local status
+  echo "$(date_time) print help" >> "${LOG_FILE}"
+  if [[ -d ${source_folder} ]]; then
+    status='is present'
+  else
+    status='is not present'
+  fi
+  cat << EOF
+
+Usage:
+  ${SCRIPT_NAME} -r | -t | -d
+  ${SCRIPT_NAME} [<advanced_options>] (-R|-T) <patch> ...
+  ${SCRIPT_NAME} -h | -x
+Options:
+  -r  install FFmpeg commands at root
+  -t  install FFmpeg commands at '${HOME}/Desktop'
+  -d  delete FFmpeg HEAD folder (the installed commands are removed on the
+      desktop, but not on root)
+  -R  apply patch and install FFmpeg commands at root
+  -T  apply patch and install FFmpeg commands at '${HOME}/Desktop'
+  -h  this help
+  -x  commands and defaults used for compilation
+Dependencies:
+  gcc, git and make; nasm or yasm
+See also:
+  man ${SCRIPT_NAME}
+  https://avpres.net/Bash_AVpres/
+About:
+  Abstract: Install, patch or delete the current FFmpeg HEAD
+  Version:  ${VERSION}
+  Folder:   '${source_folder}' ${status}
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# print commands and defaults used for compilation and exit with status 0
+print_options() {
+  echo "$(date_time) print options" >> "${LOG_FILE}"
+  cat << EOF
+
+git clone "https://git.ffmpeg.org/ffmpeg.git" "${source_folder}"
+
+for patch; do
+  git apply "\${patch}"
+done
+
+./configure --prefix=/usr/local --enable-shared --enable-version3 \\
+  --cc=clang --enable-gpl --enable-libfreetype --enable-libmp3lame \\
+  --enable-librubberband --enable-libtesseract --enable-libx264 \\
+  --enable-libx265 --enable-libxvid --disable-lzma --enable-libopenjpeg \\
+  --disable-decoder=jpeg2000 --extra-version=$(date +'%F')
+
+make -j ${THREADS}
+
+make -j ${THREADS} install
+
+make clean
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# install the current FFmpeg HEAD
+make_install() {
+  local target="${1}"
+  local path="${PWD}"
+  local patchset
+  local kbd
+
+  if ! $(which nasm) --version &> /dev/null && ! $(which yasm) --version &> /dev/null; then
+    abort "Error: No recent 'nasm' nor 'yasm' was found."
+  fi
+
+  if [[ -d "${2}" ]]; then
+    if [[ "${2%/*}" == "${2}" ]]; then
+      patchset="${path}/${2}/*"
+    else
+      patchset="${2}/*"
+    fi
+  else
+    shift
+    patchset="${*}"
+  fi
+
+  echo "$(date_time) make install" >> "${LOG_FILE}"
+  if [[ "${patch_only}" == 'yes' ]]; then
+    if [[ ! -d "${source_folder}" ]]; then
+      abort "Error: There is no FFmpeg HEAD folder to patch."
+    fi
+  else
+    if [[ ! -d "${source_folder}" ]]; then
+      echo -en "${BLUE}Install FFmpeg HEAD? (y|N) ${NC}"
+    else
+      echo -en "${BLUE}Replace FFmpeg HEAD? (y|N) ${NC}"
+    fi
+    read -rn 1 kbd
+    echo
+    if [[ "${kbd}" != [Yy] ]]; then
+      abort "Aborted by user."
+    fi
+
+    # fetch source code
+    if [[ "${PWD}" == "${source_folder}" ]]; then
+      cd "${HOME}" || abort "Error: 'cd ${HOME}' is failing."
+    fi
+    if [[ -d "${source_folder}" ]]; then
+      echo "$(date_time) removing old FFmpeg HEAD" >> "${LOG_FILE}"
+      echo -e "${BLUE}Deleting old '${source_folder}' folder.${NC}"
+      rm -rf "${source_folder}"
+    fi
+    echo "$(date_time) fetching FFmpeg HEAD" >> "${LOG_FILE}"
+    echo -e "${BLUE}Fetching FFmpeg HEAD...${NC}"
+    if ! git clone https://git.ffmpeg.org/ffmpeg.git "${source_folder}"; then
+      abort "Error: FFmpeg HEAD could not be fetched on Git."
+    fi
+  fi
+
+  # patch as needed
+  if [[ "${patchset[*]}" ]]; then
+    echo "$(date_time) > apply patchset" >> "${LOG_FILE}"
+    echo -e "${BLUE}Patching FFmpeg HEAD...${NC}"
+    cd "${source_folder}" || abort "Error: 'cd ${source_folder}' is failing."
+    for p in ${patchset[@]}; do
+      if [[ "${p%/*}" == "${p}" ]]; then
+        p="${path}/${p}"
+      fi
+      echo "$(date_time) apply patch '${p}'" >> "${LOG_FILE}"
+      if ! git apply "${p}" >> "${LOG_FILE}" 2>&1; then
+        abort "Fatal error, see '${LOG_FILE}'."
+      fi
+    done
+  fi
+
+  echo "$(date_time) installing FFmpeg HEAD" >> "${LOG_FILE}"
+  echo -e "${BLUE}Installing FFmpeg HEAD...${NC}"
+  cd "${source_folder}" || abort "Error: 'cd ${source_folder}' is failing."
+
+  # run the configuration file
+  echo "$(date_time) > configure" >> "${LOG_FILE}"
+  echo -e "${BLUE}> configure${NC}"
+  if [[ -f "${config}" ]]; then
+    chmod +x "${config}" || abort "Error: 'chmod +x ${config}' is failing."
+    if ! ${config}; then
+      abort "Error: The configuration file could not be generated."
+    fi
+  elif [[ "${target}" == 'root' ]]; then
+    if ! ./configure --prefix=/usr/local --enable-shared --enable-version3 \
+      --cc=clang --enable-gpl --enable-libfreetype --enable-libmp3lame \
+      --enable-librubberband --enable-libtesseract --enable-libx264 \
+      --enable-libx265 --enable-libxvid --disable-lzma --enable-libopenjpeg \
+      --disable-decoder=jpeg2000 --extra-version="$(date +'%F')"
+    then
+      abort "Error: The configuration file could not be generated."
+    fi
+  elif [[ "${target}" == 'test' ]]; then
+    if ! ./configure --prefix=/usr/local --enable-version3 \
+      --cc=clang --enable-gpl --enable-libfreetype --enable-libmp3lame \
+      --enable-librubberband --enable-libtesseract --enable-libx264 \
+      --enable-libx265 --enable-libxvid --disable-lzma --enable-libopenjpeg \
+      --disable-decoder=jpeg2000 --extra-version="$(date +'%F')"
+    then
+      abort "Error: The configuration file could not be generated."
+    fi
+  else
+    abort "Error: The installation target '${target}' is not valid."
+  fi
+
+  # compile the source
+  echo "$(date_time) > make" >> "${LOG_FILE}"
+  echo -e "${BLUE}> make${NC}"
+  if ! make -j "${THREADS}"; then
+    abort "Error: The software could not be compiled."
+  fi
+
+  # install the commands
+  echo "$(date_time) > make install on ${target}" >> "${LOG_FILE}"
+  echo -e "${BLUE}> make install${NC}"
+  if [[ "${target}" == 'root' ]]; then
+    if ! make -j "${THREADS}" install; then
+      abort "Error: The software could not be installed."
+    fi
+    echo -e "${BLUE}The 'ffmpeg', 'ffplay' and 'ffprobe' commands are installed on root.${NC}"
+  elif [[ "${target}" == 'test' ]]; then
+    cp ffmpeg "${HOME}/Desktop/ffmpeg"
+    cp ffplay "${HOME}/Desktop/ffplay"
+    cp ffprobe "${HOME}/Desktop/ffprobe"
+    echo -e "${BLUE}The 'ffmpeg', 'ffplay' and 'ffprobe' programs are on the Desktop.${NC}"
+  else
+    abort "Error: The installation target '${target}' is not valid."
+  fi
+  echo -e "${BLUE}FFmpeg HEAD folder is at${NC}\n  ${source_folder}"
+  echo "$(date_time) > make clean" >> "${LOG_FILE}"
+
+  # clean-up
+  if ! make clean; then
+    abort "Error: The installation folder could not be cleaned."
+  fi
+
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# delete the FFmpeg HEAD folder and the commands on the desktop
+delete_folder() {
+  local kbd
+
+  echo "$(date_time) delete folder" >> "${LOG_FILE}"
+  if [[ -d "${source_folder}" ]]; then
+    echo -en "${BLUE}Delete FFmpeg HEAD folder? (y|N) ${NC}"
+    read -rn 1 kbd
+    echo
+    if [[ "${kbd}" != [Yy] ]]; then
+      abort "Aborted by user."
+    fi
+    echo -e "${BLUE}Deleting '${source_folder}' folder.${NC}"
+    if ! rm -rf "${source_folder}"; then
+      abort "Error: The '${source_folder}' folder could not be deleted."
+    fi
+    [[ -f "${HOME}/Desktop/ffmpeg" ]] && rm "${HOME}/Desktop/ffmpeg"
+    [[ -f "${HOME}/Desktop/ffplay" ]] && rm "${HOME}/Desktop/ffplay"
+    [[ -f "${HOME}/Desktop/ffprobe" ]] && rm "${HOME}/Desktop/ffprobe"
+  else
+    abort "Error: There is no '${source_folder}' folder to delete."
+    exit 1
+  fi
+
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# parse the provided input
+(( $# == 0 )) && print_prompt
+while getopts ":trdT:R:-:hx" opt; do
+  case "${opt}" in
+    t) make_install 'test' ;;
+    r) make_install 'root' ;;
+    d) delete_folder ;;
+    T) make_install 'test' "${@:2}" ;;
+    R) make_install 'root' "${@:2}" ;;
+    -) case "${OPTARG}" in
+         test) make_install 'test' ;;
+         root) make_install 'root' ;;
+         delete) delete_folder ;;
+         patch_test=?*) make_install 'test' "${OPTARG#*=}" "${@:2}" ;;
+         patch_root=?*) make_install 'root' "${OPTARG#*=}" "${@:2}" ;;
+         config=?*) config="${OPTARG#*=}" ;;
+         source_folder=?*) source_folder="${OPTARG#*=}" ;;
+         patch_only=?*) patch_only="${OPTARG#*=}" ;;
+         help) print_help ;;
+         options) print_options ;;
+         *) abort "The option '--${OPTARG}' is not valid." ;;
+       esac ;;
+    h) print_help ;;
+    x) print_options ;;
+    :) abort "Error: The option '-${OPTARG}' requires an argument." ;;
+    *) abort "Error: The option '-${OPTARG}' is not valid." ;;
+  esac
+done

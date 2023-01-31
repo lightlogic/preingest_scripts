@@ -1,0 +1,161 @@
+.TH "modify_bagit" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+modify_bagit - Modify a BagIt archive, according to RFC 8493
+.SH SYNOPSIS
+\fBmodify_bagit\fR (\fB-b\fR|\fB-i\fR) \fIinput_folder\fR [\fB-v \fIbagit_version\fR]
+.LP
+\fBmodify_bagit -h\fR | \fB-x
+.SH DESCRIPTION
+\fBBash AVpres\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBmodify_bagit\fR. It allows to modify the BagIt version, according to the "BagIt File Packaging Format", as designed by the Library of Congress in the U.S.A. and standardised under RFC 8493.
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTIONS
+.TP 4
+\fB-b \fIinput_folder\fB, --bagit=\fIinput_folder
+input folder
+.Sp
+This replaces the \fIinput_folder\fR by its BagIt archive, containing the original folder, and is faster.
+.TP
+\fB-i \fIinput_folder\fB, --input=\fIinput_folder
+input folder
+.TP
+\fB-v \fIbagit_version\fR, \fB--version=\fIbagit_version
+RFC 8493 defines BagIt version 1.0 and \fBmodify_bagit\fR uses this by default.
+.Sp
+For compatibility reasons, however, the values from 0.93 to 0.97 are also considered valid and supported.
+.SS ADVANCED OPTIONS
+.TP 4
+The script needs an external command to compute recursively the hash checksums of all elements inside the folder.
+.TP
+.B --sha512='/bin/sha512sum'
+SHA-512 command
+.TP
+.B --md5='/bin/md5sum'
+MD5 command
+.TP
+.B --sha1='/bin/sha1sum'
+SHA-1 command
+.TP
+.B --sha256='/bin/sha256sum'
+SHA-256 command
+.TP
+.B --crc32='/bin/crc32'
+CRC-32 command
+.TP
+.B --xxh32='/bin/xxhsum -H32'
+xxHash 32 command
+.TP
+.B --xxh64='/bin/xxhsum -H64'
+xxHash 64 command
+.TP
+.B --xxh128='/bin/xxhsum -H128'
+xxHash 128 command
+.SS INFORMATIVE OPTIONS
+.TP 4
+.B -h, --help
+display a help message
+.TP
+.B -x, --options
+display the advanced options with their default arguments
+.SH NOTES
+.TP 4
+Currently \fBmodify_bagit\fR allows only to modify the version of a BagIt archive. Other possibilities may follow in future releases.
+.SS BAGIT ARCHIVE STRUCTURE
+.TP 4
+The structure of a BagIt archive is:
+.Sp
+.Vb 1
+\&bagit.txt
+\&data/<archive_content>
+\&manifest-<algorithm>.txt
+\&[bag-info.txt]
+\&[fetch.txt]
+\&[tagmanifest-<algorithm>.txt]
+.Ve
+.TP
+Only the 'bagit.txt' and 'manifest-<algorithm>.txt' files are mandatory, in addition to the 'data' folder, which contains the actual content of the archive.
+.TP
+According to RFC 8493, the 'bag-info.txt' and 'tagmanifest-<algorithm>.txt' files are optional and \fBmodify_bagit\fR updates 'tagmanifest-<algorithm>.txt' when present in the BagIt archive folder.
+.SS CONFIGURATION FILE
+.TP 4
+An external configuration file
+.Sp
+.Vb 1
+\&${HOME}/.config/AVpres/Bash_AVpres/modify_bagit.txt
+.Ve
+.TP
+can be defined, allowing the script to import alternate default values for the following options:
+.Sp
+.Vb 1
+\&bagit_version
+\&md5
+\&sha1
+\&sha256
+\&sha512
+\&crc32
+\&xxh32
+\&xxh64
+\&xxh128
+.Ve
+.SS LOG FILES
+.TP 4
+Temporary log files are stored at
+.Sp
+.Vb 1
+\&/tmp/AVpres/modify_bagit.XXXXXXXXXX
+.Ve
+.TP
+The log files can be used for debugging, for example by running \fBcat\fR on the address prompted with fatal error messages:
+.Sp
+.Vb 1
+\&cat /tmp/AVpres/modify_bagit.XXXXXXXXXX
+.Ve
+.SH SEE ALSO
+.TP 4
+\fBRFC 8493\fR, "The BagIt File Packaging Format (V1.0)", October 2018
+.br
+https://www.rfc-editor.org/info/rfc8493
+.TP
+\fBRFC 1321\fR, "The MD5 Message-Digest Algorithm", April 1992
+.br
+https://www.rfc-editor.org/info/rfc1321
+.TP
+\fBRFC 3174\fR, "US Secure Hash Algorithm (SHA1)", September 2001
+.br
+https://www.rfc-editor.org/info/rfc3174
+.TP
+"Descriptions of SHA-256, SHA-384, and SHA-512"
+.br
+https://web.archive.org/web/20130526224224/http://csrc.nist.gov/
+.br
+groups/STM/cavp/documents/shs/sha256-384-512.pdf
+.TP
+\fBmake_bagit\fR(1), \fBundo_bagit\fR(1), \fBupdate_bagit\fR(1) and \fBverify_bagit\fR(1).
+.TP
+\fBmd5sum\fR(1), \fBsha1sum\fR(1), \fBsha256sum\fR(1), \fBsha512sum\fR(1) and \fBxxhsum\fR(1).
+.SH COPYRIGHT
+Copyright (c) 2021-2023 by Reto Kromer
+.SH LICENSE
+The \fBmodify_bagit\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBmodify_bagit\fR Bash script is provided "as is" without warranty or support of any kind.

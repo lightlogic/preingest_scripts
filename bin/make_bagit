@@ -1,0 +1,407 @@
+#!/usr/bin/env bash
+
+# Make a BagIt archive of a folder, according to RFC 8493.
+#
+# Copyright (c) 2014-2023 by Reto Kromer <https://reto.ch>
+#
+# This Bash script is released under a 3-Clause BSD License and is provided
+# "as is" without warranty or support of any kind.
+
+
+# initialise constants
+VERSION='2022-12-31'
+SCRIPT_NAME="$(basename "$0")"
+CONFIG_FILE="${HOME}/.config/AVpres/Bash_AVpres/${SCRIPT_NAME}.txt"
+RED='\033[1;31m'
+BLUE='\033[1;34m'
+NC='\033[0m'
+
+# load configuration file if any and initialise default values
+[[ -f "${CONFIG_FILE}" ]] && . "${CONFIG_FILE}"
+bagit_version="${bagit_version:-1.0}"
+algorithm="${algorithm:-sha512}"
+md5="${md5:-$(which md5sum)}"
+sha1="${sha1:-$(which sha1sum)}"
+sha256="${sha256:-$(which sha256sum)}"
+sha512="${sha512:-$(which sha512sum)}"
+crc32="${crc32:-$(which crc32)}"
+xxh32="${xxh32:-$(which xxhsum) -H32}"
+xxh64="${xxh64:-$(which xxhsum) -H64}"
+xxh128="${xxh128:-$(which xxhsum) -H128}"
+cp_bin="${cp_bin:-$(which gcp) --preserve=mode,timestamps -r}"
+with_scripts="${with_scripts:-no}"
+if (( "${#exclusion[@]}" == 0 )); then
+  exclusion=('.DS_Store' 'desktop.ini')
+elif [[ "${exclusion}" == '' ]]; then
+  unset exclusion
+fi
+
+# initialise other default values
+replace='no'
+version_regex='^1.0|0.9[3-7]$'  # 1.0 and from 0.93 to 0.97
+algorithm_regex='^(md5|sha1|sha256|sha512|crc32|xxh32|xxh64|xxh128)$'
+
+# initialise variables
+unset input_path
+unset output_path
+unset bag_info
+unset fetch
+unset tmp_input_path
+
+# enable extended pattern matching features
+shopt -s extglob
+
+
+# get date-and-time stamp
+date_time() {
+  TZ='UTC' date +'[%F %T %Z]'
+}
+
+
+# print an error message and exit with status 1
+abort() {
+  echo -e "${RED}${1:-An unknown error occurred.\a}${NC}"
+  echo "$(date_time) ${1:-An unknown error occurred.}" >> "${LOG_FILE}"
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 1
+}
+
+
+# print a minimal help message and exit with status 0
+print_prompt() {
+  echo "$(date_time) print prompt" >> "${LOG_FILE}"
+  cat << EOF
+Help:
+  ${SCRIPT_NAME} -h
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# print the help message and exit with status 0
+print_help() {
+  echo "$(date_time) print help" >> "${LOG_FILE}"
+  cat << EOF
+
+Usage:
+  ${SCRIPT_NAME} -b <input_folder> | -i <input_folder> -o <output_folder>
+  ${SCRIPT_NAME} -h | -x
+Options:
+  -b  replace the input folder by its BagIt archive
+  -i  input folder
+  -o  output BagIt archive folder
+  -h  this help
+  -x  advanced options with their default arguments
+Default dependencies:
+  gcp; one of sha512sum (default), md5sum, sha1sum, sha256sum, xxhsum or crc32
+See also:
+  man ${SCRIPT_NAME}
+  https://avpres.net/Bash_AVpres/
+About:
+  Abstract: Make a BagIt archive of a folder, according to RFC 8493
+  Version:  ${VERSION}
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# print advanced options with their default arguments and exit with status 0
+print_options() {
+  local tmp
+  local each
+
+  echo "$(date_time) print options" >> "${LOG_FILE}"
+  for each in "${exclusion[@]}"; do
+    tmp="$tmp '${each}'"
+  done
+  cat << EOF
+
+Advanced options with their default arguments:
+  --bagit_version='${bagit_version}'
+  --algorithm='${algorithm}'
+  --md5='${md5}'
+  --sha1='${sha1}'
+  --sha256='${sha256}'
+  --sha512='${sha512}'
+  --crc32='${crc32}'
+  --xxh32='${xxh32}'
+  --xxh64='${xxh64}'
+  --xxh128='${xxh128}'
+  --cp='${cp_bin}'
+  --with_scripts='${with_scripts}'
+  --exclusion=(${tmp# })
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# check that external move or copy command is running
+check_commands() {
+  if [[ "${replace}" == 'yes' ]]; then
+    if ! command -v mv &> /dev/null; then
+      abort "Error: 'mv' is failing."
+    fi
+  elif ! command -v ${cp_bin} &> /dev/null; then
+    abort "Error: '${cp_bin}' is failing."
+  fi
+}
+
+
+# check that hash checksum command is valid and running
+check_algorithm() {
+  local orig_algorithm="${algorithm}"
+
+  algorithm="$(echo "${algorithm}" | awk '{print tolower($0)}')"
+  if [[ ! $(echo "${algorithm}" | grep -E "${algorithm_regex}") ]]; then
+    abort "Error: Algorithm '${orig_algorithm}' is not valid."
+  fi
+  if ! command -v ${!algorithm} &> /dev/null; then
+    abort "Error: '${algorithm}' is failing."
+  fi
+}
+
+
+# check that provided input and output folders are valid
+# and normalise path if needed
+check_input() {
+  if [[ ! "${input_path}" ]]; then
+    abort "Error: No input folder provided via '-i', '-b', '--input' or '--bagit'."
+  elif [[ ! -d "${input_path}" ]]; then
+    abort "Error: '${input_path}' is not a directory."
+  fi
+  if [[ "${input_path%/*}" == "${input_path}" ]]; then
+    input_path="${PWD}/${input_path}"
+  fi
+  tmp_input_path="${input_path}"
+  input_path="$(echo "${input_path}" | tr ' ' '_' | tr -cd 'A-Za-z0-9/_-')"
+  if [[ "${tmp_input_path}" != "${input_path}" ]]; then
+    mv "${tmp_input_path}" "${input_path}"
+  fi
+  if [[ -d "${input_path}/data" ]]; then
+    abort "Error: The input folder '${input_path}' already includes a 'data' folder."
+  fi
+  if [[ -f "${input_path}/bagit.txt" ]]; then
+    abort "Error: The input folder '${input_path}' already includes a 'bagit-txt' file."
+  fi
+  if [[ -f "${input_path}/manifest-${algorithm}.txt" ]]; then
+    abort "Error: The input folder '${input_path}' already includes a 'manifest-${algorithm}.txt' file."
+  fi
+  if [[ ! $(echo "${bagit_version}" | grep -E "${version_regex}") ]]; then
+    abort "Error: BagIt-Version '${bagit_version}' is not valid."
+  fi
+  if [[ "${replace}" == 'yes' ]]; then
+    echo "$(date_time) move data to 'data/'" >> "${LOG_FILE}"
+    mkdir -p "${input_path}/data"
+    for f in "${input_path}/"!(data); do
+      if ! mv "${f}" "${input_path}/data"; then
+        abort "Fatal error, see '${LOG_FILE}'."
+      fi
+    done
+    output_path="${input_path}"
+    input_path="${input_path}/data"
+  else
+    if [[ ! "${output_path}" ]]; then
+      abort "Error: No output folder provided via '-o' or '--output'."
+    fi
+    if [[ "${output_path%/*}" == "${output_path}" ]]; then
+      output_path="${PWD}/${output_path}"
+    fi
+    if [[ "${input_path}" == "${output_path}" ]]; then
+      abort "Error: Input and output must be different: '${input_path}'."
+    fi
+    output_path="$(echo "${output_path}" | tr ' ' '_' | tr -cd 'A-Za-z0-9/_-')"
+    if ! mkdir -p "${output_path}/data"; then
+      abort "Fatal error, see '${LOG_FILE}'."
+    fi
+  fi
+}
+
+
+# make BagIt archive
+make_bagit() {
+  local number
+  local size
+  local tmp
+  local unit
+  local value
+  local tmp_manifest="$(mktemp -q "/tmp/AVpres/tmp_${SCRIPT_NAME}.XXXXXXXXXX")"
+  local each
+
+  if [[ "${replace}" == 'yes' ]]; then
+    echo "$(date_time) input='${output_path}'" >> "${LOG_FILE}"
+  else
+    echo "$(date_time) input='${input_path}'" >> "${LOG_FILE}"
+  fi
+  echo "$(date_time) output='${output_path}'" >> "${LOG_FILE}"
+  if [[ "${replace}" == 'yes' ]]; then
+    echo "$(date_time) mv='$(which mv)'" >> "${LOG_FILE}"
+  else
+    echo "$(date_time) cp='${cp_bin}'" >> "${LOG_FILE}"
+  fi
+  echo "$(date_time) ${algorithm}='${!algorithm}'" >> "${LOG_FILE}"
+
+  # write 'bagit.txt'
+  echo "$(date_time) write 'bagit.txt'" >> "${LOG_FILE}"
+  echo "BagIt-Version: ${bagit_version}" > "${output_path}/bagit.txt"
+  echo "Tag-File-Character-Encoding: UTF-8" >> "${output_path}/bagit.txt"
+
+  # compute and write 'manifest-<algorithm>.txt'
+  echo "$(date_time) compute and write 'manifest-${algorithm}.txt'" >> "${LOG_FILE}"
+  # delete eclusion files
+  for each in "${exclusion[@]}"; do
+    find "${input_path}" -name "${each}" -type f -delete
+  done
+  # replace spaces by underscore signs in folder and file names
+  find "${input_path}" -name "* *" -print0 | sort -rz | \
+    while read -d $'\0' f; do
+      mv -v "${f}" "$(dirname "${f}")/$(basename "${f// /_}")"
+    done
+  echo -e "${BLUE}Please wait while creating the manifest...${NC}"
+  cd "${input_path}" || abort "Error: 'cd ${input_path}' is failing."
+  if ! find . -type f -print0 | xargs -0 ${!algorithm} > "${tmp_manifest}"; then
+    abort "Fatal error, see '${LOG_FILE}'."
+  fi
+  sed "s#\./#data/#" > "${output_path}/manifest-${algorithm}.txt" < "${tmp_manifest}"
+  echo -e "${BLUE}... done.${NC}"
+
+  # write 'data/'
+  if [[ "${replace}" == 'no' ]]; then
+    echo "$(date_time) write 'data/'" >> "${LOG_FILE}"
+    echo -e "${BLUE}Please wait while copying the files...${NC}"
+    for f in "${input_path}"/*; do
+      ${cp_bin} "${f}" "${output_path}/data" >> "${LOG_FILE}" 2>&1
+    done
+    (( $? != 0 )) && abort "Fatal error, see '${LOG_FILE}'."
+    echo -e "${BLUE}... done.${NC}"
+  fi
+
+  # write 'bag-info.txt'
+  echo "$(date_time) write 'bag-info.txt'" >> "${LOG_FILE}"
+  echo "Bagging-Date: $(date +'%F')" > "${output_path}/bag-info.txt"
+  tmp="$(du -hd 0 "${output_path}/data" | cut -f1)"
+  value="$(echo ${tmp} | grep -oE '[0-9.]+')"
+  unit="$(echo ${tmp} | grep -oE '[KMGT]')B"
+  echo "Bag-Size: ${value} ${unit}" >> "${output_path}/bag-info.txt"
+  echo -e "${BLUE}Please wait while creating the BagIt archive...${NC}"
+  for f in $(find ${output_path}/data -type f); do
+    (( size+=$(wc -c < ${f} | bc) ))
+  done
+  number=$(find ${output_path}/data -type f | wc -l | bc)
+  echo "Payload-Oxum: ${size}.${number}" >> "${output_path}/bag-info.txt"
+  echo -e "${BLUE}... done.${NC}"
+  cd - &> /dev/null || abort
+  if [[ "${bag_info}" ]]; then
+    cat "${bag_info}" >> "${output_path}/bag-info.txt"
+  fi
+
+  # write 'fetch.txt'
+  if [[ "${fetch}" ]]; then
+    cat "${fetch}" >> "${output_path}/fetch.txt"
+  fi
+
+  # embed 'make_bagit.txt', 'verity_bagit.txt' and 'undo_bagit.txt' code
+  if [[ "${with_scripts}" == 'yes' ]]; then
+    echo "$(date_time) embed 'make_bagit.txt'" >> "${LOG_FILE}"
+    cat "$(which make_bagit)" > "${output_path}/make_bagit.txt"
+    echo "$(date_time) embed 'verify_bagit.txt'" >> "${LOG_FILE}"
+    cat "$(which verify_bagit)" > "${output_path}/verify_bagit.txt"
+    echo "$(date_time) embed 'undo_bagit.txt'" >> "${LOG_FILE}"
+    cat "$(which undo_bagit)" > "${output_path}/undo_bagit.txt"
+  fi
+
+  # compute and write 'tagmanifest-<algorithm>.txt'
+  echo "$(date_time) compute and write 'tagmanifest-${algorithm}.txt'" >> "${LOG_FILE}"
+  if ! ${!algorithm} "${output_path}"/*.txt > "${tmp_manifest}"; then
+    abort "Fatal error, see '${LOG_FILE}'."
+  fi
+  sed "s#${output_path}/##g" > "${output_path}/tagmanifest-${algorithm}.txt" < "${tmp_manifest}"
+
+  # reset initial filename
+  if [[ "${replace}" == 'no' && "${tmp_input_path}" != "${input_path}" ]]; then
+    mv "${input_path}" "${tmp_input_path}"
+  fi
+
+  rm "${tmp_manifest}"
+}
+
+
+# check that Bash 3.2 or later is running
+if ! printf '%s\n%s\n' "$(bash -c 'echo ${BASH_VERSION}')" "3.2" | sort -rVC; then
+  echo -e "${BLUE}Warning: This 'bash' binary is very old. Tested for version 3.2 or later.${NC}"
+fi
+
+# start log file
+[[ -d '/tmp/AVpres' ]] || mkdir -p '/tmp/AVpres'
+LOG_FILE="$(mktemp -q "/tmp/AVpres/${SCRIPT_NAME}.XXXXXXXXXX")"
+echo "$(date_time) ${SCRIPT_NAME} ${VERSION}" > "${LOG_FILE}"
+echo "$(date_time) $0 $*" >> "${LOG_FILE}"
+echo "$(date_time) START" >> "${LOG_FILE}"
+
+# parse and process provided input
+(( $# == 0 )) && print_prompt
+while getopts ":b:i:o:-:hx" opt; do
+  case "${opt}" in
+    b) if [[ "${OPTARG:0:1}" == '-' ]]; then
+         abort "Error: The parameter '-b' requires an argument."
+       else
+         replace='yes'
+         input_path="${OPTARG}"
+       fi ;;
+    i) if [[ "${OPTARG:0:1}" == '-' ]]; then
+         abort "Error: The option '-i' requires an argument."
+       else
+         input_path="${OPTARG}"
+       fi ;;
+    o) if [[ "${OPTARG:0:1}" == '-' ]]; then
+         abort "Error: The option '-o' requires an argument."
+       else
+         output_path="${OPTARG}"
+       fi ;;
+    -) case "${OPTARG}" in
+         bagit=?*) replace='yes'; input_path="${OPTARG#*=}" ;;
+         input=?*) input_path="${OPTARG#*=}" ;;
+         output=?*) output_path="${OPTARG#*=}" ;;
+         bagit_version=?*) bagit_version="${OPTARG#*=}" ;;
+         algorithm=?*) algorithm="${OPTARG#*=}" ;;
+         md5=?*) md5="${OPTARG#*=}" ;;
+         sha1=?*) sha1="${OPTARG#*=}" ;;
+         sha256=?*) sha256="${OPTARG#*=}" ;;
+         sha512=?*) sha512="${OPTARG#*=}" ;;
+         crc32=?*) crc32="${OPTARG#*=}" ;;
+         xxh32=?*) xxh32="${OPTARG#*=}" ;;
+         xxh64=?*) xxh64="${OPTARG#*=}" ;;
+         xxh128=?*) xxh128="${OPTARG#*=}" ;;
+         cp=?*) cp_bin="${OPTARG#*=}" ;;
+         bag_info=?*) bag_info="${OPTARG#*=}" ;;
+         fetch=?*) fetch="${OPTARG#*=}" ;;
+         with_scripts=?*) with_scripts="${OPTARG#*=}" ;;
+         help) print_help ;;
+         options) print_options ;;
+         *) abort "Error: The option '--${OPTARG}' is not valid." ;;
+       esac ;;
+    h) print_help ;;
+    x) print_options ;;
+    :) abort "Error: The option '-${OPTARG}' requires an argument." ;;
+    *) abort "Error: The option '-${OPTARG}' is not valid." ;;
+  esac
+done
+
+# check that external move/copy is running
+check_commands
+
+# check that external hash checksum command is running
+check_algorithm
+
+# check input
+check_input
+
+# make BagIt archive
+make_bagit
+
+# end log file
+echo "$(date_time) END" >> "${LOG_FILE}"

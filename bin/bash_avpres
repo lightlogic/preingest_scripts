@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+# Commands provided by Bash AVpres.
+#
+# Copyright (c) 2003-2023 by Reto Kromer <https://reto.ch>
+#
+# This Bash script is released under a 3-Clause BSD License and is provided
+# "as is" without warranty or support of any kind.
+
+
+# initialise constants
+VERSION='2022-12-31'
+CONFIG_PATH="${HOME}/.config/AVpres/Bash_AVpres"
+BLUE='\033[1;34m'
+NC='\033[0m'
+
+# check that Bash 3.2 or later is running
+if ! printf '%s\n%s\n' "$(bash -c 'echo ${BASH_VERSION}')" "3.2" | sort -rVC; then
+  echo -e "${BLUE}Warning: This 'bash' binary is very old. Tested for version 3.2 or later.${NC}"
+fi
+
+# check configuration file
+if [[ -f "${CONFIG_PATH}/config.txt" ]] && . "${CONFIG_PATH}/config.txt"; then
+  [[ "${INSTALLED_VERSION}" != "${VERSION}" ]] \
+    && sed -i.bak "s/^\(INSTALLED_VERSION=\).*/\1'${VERSION}'/" "${CONFIG_PATH}/config.txt"
+  [[ -f "${CONFIG_PATH}/config.txt.bak" ]] && rm "${CONFIG_PATH}/config.txt.bak"
+else
+  [[ ! -d "${CONFIG_PATH}" ]] && mkdir -p "${CONFIG_PATH}"
+  cat << EOF > "${CONFIG_PATH}/config.txt"
+# Please don't edit me.
+# $(TZ='UTC' date +'%F %T %Z')
+INSTALLED_VERSION='${VERSION}'
+EOF
+fi
+
+# print installed commands and manual pages
+cat << EOF
+
+Bash AVpres ${VERSION} provides the following commands:
+  make_bagit                undo_bagit                missing_files
+  make_ffv1
+  make_framemd5             update_bagit              name_hash
+  make_h264                 update_manifest
+  make_manifest                                       bash_avpres
+  make_prores               verify_bagit              ffengine_presets
+                            verify_ffv1               ffmpeg_head
+  modify_bagit              verify_framemd5           nano_config
+                            verify_manifest
+
+EOF

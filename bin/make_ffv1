@@ -1,0 +1,393 @@
+#!/usr/bin/env bash
+
+# Make a Matroska/FFV1 file.
+#
+# Copyright (c) 2012-2023 by Reto Kromer <https://reto.ch>
+#
+# This Bash script is released under a 3-Clause BSD License and is provided
+# "as is" without warranty or support of any kind.
+
+
+# initialise constants
+VERSION='2022-12-31'
+SCRIPT_NAME="$(basename "$0")"
+CONFIG_FILE="${HOME}/.config/AVpres/Bash_AVpres/${SCRIPT_NAME}.txt"
+RED='\033[1;31m'
+BLUE='\033[1;34m'
+NC='\033[0m'
+
+# load configuration file if any and initialise default values
+[[ -f "${CONFIG_FILE}" ]] && . "${CONFIG_FILE}"
+ffmpeg_bin="${ffmpeg_bin:-$(which ffmpeg)}"
+ffprobe_bin="${ffprobe_bin:-$(which ffprobe)}"
+ff_glo_opt="${ff_glo_opt:--y}"
+f="${f:-image2}"
+framerate="${framerate:-24}"
+filter_v="${filter_v}"
+c_v="${c_v:-ffv1}"
+level="${level:-3}"
+coder="${coder:-1}"
+context="${context:-1}"
+g="${g:-1}"
+slicecrc="${slicecrc:-1}"
+filter_a="${filter_a}"
+c_a="${c_a:-copy}"
+suffix="${suffix:-_FFV1}"
+extension="${extension:-mkv}"  # 'avi' is also supported
+
+# initialise variables
+unset input_path
+unset output_path
+unset ff_in_opt
+unset ff_out_opt
+unset first_file
+unset start_number
+unset input_file_regex
+
+
+# get date-and-time stamp
+date_time() {
+  TZ='UTC' date +'[%F %T %Z]'
+}
+
+
+# check that Bash 3.2 or later is running
+if ! printf '%s\n%s\n' "$(bash -c 'echo ${BASH_VERSION}')" "3.2" | sort -rVC; then
+  echo -e "${BLUE}Warning: This 'bash' binary is very old. Tested for version 3.2 or later.${NC}"
+fi
+
+# start log file
+[[ -d '/tmp/AVpres' ]] || mkdir -p '/tmp/AVpres'
+LOG_FILE="$(mktemp "/tmp/AVpres/${SCRIPT_NAME}.XXXXXXXXXX")"
+echo "$(date_time) ${SCRIPT_NAME} ${VERSION}" > "${LOG_FILE}"
+echo "$(date_time) $0 $*" >> "${LOG_FILE}"
+echo "$(date_time) START" >> "${LOG_FILE}"
+
+
+# print an error message and exit with status 1
+abort() {
+  echo -e "${RED}${1:-An unknown error occurred.\a}${NC}"
+  echo "$(date_time) ${1:-An unknown error occurred.}" >> "${LOG_FILE}"
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 1
+}
+
+
+# initialise other default values
+valid_slices=(4 6 9 12 15 16 20 24 25 28 30 35 36 40 42 45 48 49 54 56 60 63 64 66 70 72 77 80 81 84 88 90 91 96 99 100 104 108 110 112 117 120 121 126 130 132 135 140 143 144 150 153 154 156 160 165 168 169 170 176 180 182 187 190 192 195 196 198 204 208 209 210 216 220 221 224 225 228 231 234 238 240 247 252 255 256 260 264 266 270 272 273 276 280 285 286 288 289 294 299 300 304 306 308 312 315 320 322 323 324 325 330 336 340 342 345 350 352 357 360 361 364 368 374 375 378 380 384 390 391 396 399 400 405 408 414 416 418 420 425 432 435 437 440 441 442 448 450 456 459 460 462 464 468 475 476 480 483 484 486 493 494 496 500 504 506 510 513 520 522 525 527 528 529 532 540 544 546 550 551 552 558 560 561 567 570 572 575 576 580 588 589 594 598 600 608 609 612 616 620 621 624 625 627 630 638 640 644 646 648 650 651 660 665 667 672 675 676 680 682 684 690 693 696 700 702 703 704 713 714 720 725 726 728 729 735 736 740 744 748 750 754 756 759 760 768 770 775 777 780 782 783 784 792 798 800 805 806 810 812 814 816 819 825 828 832 836 837 840 841 850 851 858 861 864 868 870 874 875 880 884 888 891 896 897 899 900 902 910 912 918 920 924 925 928 930 936 943 945 946 950 952 957 960 961 962 966 972 975 980 984 986 988 989 990 992 999 1000 1008 1012 1014 1015 1020 1023)
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  threads="$(sysctl -n hw.ncpu)"
+elif [[ "$(uname -s)" == "Linux" ]]; then
+  threads="$(grep -c ^processor /proc/cpuinfo)"
+else
+  abort "Error: The operating system '$(uname -s)' is not supported."
+fi
+if [[ ! "${slices}" ]]; then
+  let "slices = ${threads} * 2 ** 2"
+fi
+while true; do
+  if [[ " ${valid_slices[@]} " =~ " ${slices} " ]]; then
+    break
+  else
+    ((slices--))
+  fi
+done
+
+
+# print a minimal help message and exit with status 1
+print_prompt() {
+  echo "$(date_time) print prompt" >> "${LOG_FILE}"
+  cat << EOF
+Help:
+  ${SCRIPT_NAME} -h
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 1
+}
+
+
+# print the help message and exit with status 0
+print_help() {
+  echo "$(date_time) print help" >> "${LOG_FILE}"
+  cat << EOF
+
+Usage:
+  ${SCRIPT_NAME} -i <input_path> -o <output_file>
+  ${SCRIPT_NAME} -h | -x
+Options:
+  -i  input file (stream based) or folder (single-image based)
+  -o  output file
+  -h  this help
+  -x  advanced options with their default arguments
+Dependencies:
+  ffmpeg and ffprobe
+See also:
+  man ${SCRIPT_NAME}
+  https://avpres.net/Bash_AVpres/
+About:
+  Abstract: Make a Matroska/FFV1 file
+  Version:  ${VERSION}
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# display advanced options with their default arguments and exit with status 0
+print_options() {
+  echo "$(date_time) print options" >> "${LOG_FILE}"
+  cat << EOF
+
+FFmpeg default binaries:
+  --ffmpeg='${ffmpeg_bin}'
+  --ffprobe='${ffprobe_bin}'
+
+Global ffmpeg option:
+  --ff_glo_opt='${ff_glo_opt}'
+
+Input file default parameters (used only for single-image based input files):
+  --f='${f}'
+  --framerate='${framerate}'
+
+Video codec default parameters:
+  --filter_v='${filter_v}'
+  --c_v='${c_v}'
+  --level='${level}'
+  --coder='${coder}'
+  --threads='${threads}'
+  --context='${context}'
+  --g='${g}'
+  --slices='${slices}'
+  --slicecrc='${slicecrc}'
+
+Audio codec default parameters (only used when audio stream is present):
+  --filter_a='${filter_a}'
+  --c_a='${c_a}'
+
+Output file default parameters:
+  --suffix='${suffix}'
+  --extension='${extension}'
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# check if external ffmpeg and ffprove commands are running
+check_ffmpeg() {
+  if command -v "${ffmpeg_bin}" &> /dev/null; then
+    echo "$(date_time) '${ffmpeg_bin}' found" >> "${LOG_FILE}"
+  else
+    abort "Error: 'ffmpeg' binary not found."
+  fi
+  if command -v "${ffprobe_bin}" &> /dev/null; then
+    echo "$(date_time) '${ffprobe_bin}' found" >> "${LOG_FILE}"
+  else
+    abort "Error: 'ffprobe' binary not found."
+  fi
+}
+
+
+# verify that the input is valid
+verify_input() {
+  local in_file="${1}"
+
+  echo "$(date_time) verify input" >> "${LOG_FILE}"
+
+  # check slice number
+  if (( slices < 4 || 1023 < slices )); then
+    abort "Error: '${slices}' is not a valid number of slices."
+  fi
+  if [[ ! " ${valid_slices[@]} " =~ " ${slices} " ]]; then
+    echo -en "${BLUE}Warning: '${slices}' is an invalid value of slices;"
+    while true; do
+      if [[ " ${valid_slices[@]} " =~ " ${slices} " ]]; then
+        break
+      else
+        ((slices--))
+      fi
+    done
+    echo -e " using '${slices}' instead.${NC}"
+    echo "$(date_time) using ${slices} slices" >> "${LOG_FILE}"
+  fi
+
+  # check input file or folder
+  if [[ ! "${in_file}" || "${in_file}" == "_." ]]; then
+    abort "Error: No input file or folder provided via '-i' or '--input'."
+  elif [[ ! -f "${in_file}" ]]; then
+    abort "Error: '${input_path}' is not a valid input."
+  elif "${ffprobe_bin}" "${in_file}" 2>&1 | grep "Invalid data found" > /dev/null; then
+    abort "Error: '$(basename ${input_path})' is not an AV file."
+  fi
+
+  return 0
+}
+
+
+# verify that the output file is valid
+verify_output() {
+  local out_file="${1}"
+
+  echo "$(date_time) verify output" >> "${LOG_FILE}"
+  if [[ ! "${out_file}" ]]; then
+    abort "Error: No output file provided via '-o' or '--output'."
+  elif ! : > "${out_file}.txt" &> /dev/null; then
+    abort "Error: Cannot create an output file '${out_file}'."
+  else
+    rm "${out_file}.txt"
+  fi
+  if [[ "${input_path}" == "${output_path}" ]]; then
+    abort "Error: '${input_path}' cannot be both input and output."
+  fi
+
+  return 0
+}
+
+
+# prepare the parameters for the ffmpeg command
+prepare_command() {
+  if [[ -d "${input_path}" ]]; then
+    if [[ "${start_number}" == $(basename "${first_file%.*}") ]]; then
+      input_file_regex="%0${#start_number}d.${first_file##*.}"
+    else
+      input_file_regex="${first_file%_*}_%0${#start_number}d.${first_file##*.}"
+    fi
+    ff_in_opt+=" -f ${f} -framerate ${framerate}"
+    if (( $(echo "${start_number}" | bc -l) > 1 )); then
+      ff_in_opt+=" -start_number ${start_number}"
+    fi
+    ff_out_opt+=" -an"
+  elif [[ ! $("${ffprobe_bin}" "${input_path}" -show_streams -select_streams a -loglevel quiet) ]]; then
+    ff_out_opt+=" -an"
+  else
+    if [[ "${filter_a}" ]]; then
+      ff_out_opt+=" -filter:a ${filter_a}"
+    fi
+    ff_out_opt+=" -c:a ${c_a}"
+  fi
+  if [[ "${filter_v}" ]]; then
+    ff_out_opt+=" -filter:v ${filter_v}"
+  fi
+  ff_out_opt+=" -c:v ${c_v} -level ${level} -coder ${coder} \
+    -context ${context} -g ${g} -slices ${slices} -slicecrc ${slicecrc}"
+  if [[ "${threads}" ]]; then
+    ff_out_opt+=" -threads ${threads}"
+  fi
+  if [[ -d "${input_path}" ]]; then
+    input_file="${input_path}/${input_file_regex}"
+  else
+    input_file="${input_path}"
+  fi
+  if [[ "${suffix}" == '#' ]]; then
+    if [[ "${output_path}" == "${output_path##*.}" ]]; then
+      output_file="${output_path%.*}.${extension}"
+    else
+      output_file="${output_path}"
+    fi
+  else
+    if [[ "${output_path}" == "${output_path##*.}" ]]; then
+      output_file="${output_path%.*}${suffix}.${extension}"
+    else
+      output_file="${output_path%.*}${suffix}.${output_path##*.}"
+    fi
+  fi
+}
+
+
+# transcode to FFV1
+transcode() {
+  local in_file="${1}"
+  local out_file="${2}"
+
+  echo "$(date_time) Generating '${out_file}'" >> "${LOG_FILE}"
+  echo -e "${BLUE}Please wait while generating '${out_file}'...${NC}"
+  [[ "${ff_glo_opt}" == '#' ]] && ff_glo_opt=''
+  echo "$(date_time) ${ffmpeg_bin} ${ff_glo_opt} ${ff_in_opt} -i ${in_file} \
+    ${ff_out_opt} ${out_file}" >> "${LOG_FILE}"
+  if ! "${ffmpeg_bin}" ${ff_glo_opt} ${ff_in_opt} -i "${in_file}" \
+    ${ff_out_opt} "${out_file}" >> "${LOG_FILE}" 2>&1
+  then
+    abort "Fatal error, see '${LOG_FILE}'."
+  fi
+  echo -e "${BLUE}... done.${NC}"
+
+  return 0
+}
+
+
+# parse and process provided input
+(( $# == 0 )) && print_prompt
+while getopts ":i:o:-:hx" opt; do
+  case "${opt}" in
+    i) if [[ "${OPTARG:0:1}" == '-' ]]; then
+         abort "Error: The option '-i' requires an argument."
+       else
+         input_path="${OPTARG}"
+       fi ;;
+    o) if [[ "${OPTARG:0:1}" == '-' ]]; then
+         abort "Error: The option '-o' requires an argument."
+       else
+         output_path="${OPTARG}"
+       fi ;;
+    -) case "${OPTARG}" in
+         input=?*) input_path="${OPTARG#*=}" ;;
+         output=?*) output_path="${OPTARG#*=}" ;;
+         ffmpeg=?*) ffmpeg_bin="${OPTARG#*=}" ;;
+         ffprobe=?*) ffprobe_bin="${OPTARG#*=}" ;;
+         ff_glo_opt=?*) ff_glo_opt="${OPTARG#*=}" ;;
+         f=?*) f="${OPTARG#*=}" ;;
+         framerate=?*) framerate="${OPTARG#*=}" ;;
+         filter_v=?*) filter_v="${OPTARG#*=}" ;;
+         c_v=?*) c_v="${OPTARG#*=}" ;;
+         level=?*) level="${OPTARG#*=}" ;;
+         threads=?*) threads="${OPTARG#*=}" ;;
+         coder=?*) coder="${OPTARG#*=}" ;;
+         context=?*) context="${OPTARG#*=}" ;;
+         g=?*) g="${OPTARG#*=}" ;;
+         slices=?*) slices="${OPTARG#*=}" ;;
+         slicecrc=?*) slicecrc="${OPTARG#*=}" ;;
+         filter_a=?*) filter_a="${OPTARG#*=}" ;;
+         c_a=?*) c_a="${OPTARG#*=}" ;;
+         suffix=?*) suffix="${OPTARG#*=}" ;;
+         extension=?*) extension="${OPTARG#*=}" ;;
+         help) print_help ;;
+         options) print_options ;;
+         *) abort "Error: The option '--${OPTARG}' is not valid." ;;
+       esac ;;
+    h) print_help ;;
+    x) print_options ;;
+    :) abort "Error: The option '-${OPTARG}' requires an argument." ;;
+    *) abort "Error: The option '-${OPTARG}' is not valid." ;;
+  esac
+done
+
+# check that FFmpeg is running
+check_ffmpeg
+
+# check that provided input file is valid
+if [[ -d "${input_path}" ]]; then
+  first_file=$(ls "${input_path}" | sort | head -n 1)
+  start_number=$(echo "${first_file}" | grep -oE '_[0-9]+\.' | grep -oE '[0-9]+')
+  if [[ ! "${start_number}" ]]; then
+    start_number=$(echo "${first_file}" | grep -oE '[0-9]+')
+  fi
+  if [[ "${start_number}" == $(basename "${first_file%.*}") ]]; then
+    verify_input "${input_path}/${start_number}.${first_file##*.}"
+  else
+    verify_input "${input_path}/${first_file%_*}_${start_number}.${first_file##*.}"
+  fi
+else
+  verify_input "${input_path}"
+fi
+
+# check that provided output file is valid
+verify_output "${output_path}"
+
+# transcode from input file to output file
+prepare_command
+transcode "${input_file}" "${output_file}"
+
+# end log file
+echo "$(date_time) END" >> "${LOG_FILE}"

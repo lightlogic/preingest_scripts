@@ -1,0 +1,246 @@
+#!/usr/bin/env bash
+
+# Find missing files in a folder of sequentially numbered files.
+#
+# Copyright (c) 2004-2023 by Reto Kromer <https://reto.ch>
+#
+# This Bash script is released under a 3-Clause BSD License and is provided
+# "as is" without warranty or support of any kind.
+
+
+# initialise constants
+VERSION='2022-12-31'
+SCRIPT_NAME="$(basename "$0")"
+RED='\033[1;31m'
+BLUE='\033[1;34m'
+NC='\033[0m'
+
+# initialise default value
+output_file="${output_file:-<folder>_missing.txt}"
+
+# initialise variables
+unset input_folder
+
+
+# get date-and-time stamp
+date_time() {
+  TZ='UTC' date +'[%F %T %Z]'
+}
+
+
+# check that Bash 3.2 or later is running
+if ! printf '%s\n%s\n' "$(bash -c 'echo ${BASH_VERSION}')" "3.2" | sort -rVC; then
+  echo -e "${BLUE}Warning: This 'bash' binary is very old. Tested for version 3.2 or later.${NC}"
+fi
+
+# start log file
+[[ -d '/tmp/AVpres' ]] || mkdir -p '/tmp/AVpres'
+LOG_FILE="$(mktemp -q "/tmp/AVpres/${SCRIPT_NAME}.XXXXXXXXXX")"
+echo "$(date_time) ${SCRIPT_NAME} ${VERSION}" > "${LOG_FILE}"
+echo "$(date_time) $0 $*" >> "${LOG_FILE}"
+echo "$(date_time) START" >> "${LOG_FILE}"
+
+
+# print an error message and exit with status 1
+abort() {
+  echo -e "${RED}${1:-An unknown error occurred.\a}${NC}"
+  echo "$(date_time) ${1:-An unknown error occurred.}" >> "${LOG_FILE}"
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 1
+}
+
+
+# print a minimal help message and exit with status 0
+print_prompt() {
+  echo "$(date_time) print prompt" >> "${LOG_FILE}"
+  cat << EOF
+Help:
+  ${SCRIPT_NAME} -h
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# print the help message and exit with status 0
+print_help() {
+  echo "$(date_time) print help" >> "${LOG_FILE}"
+  cat << EOF
+
+Usage:
+  ${SCRIPT_NAME} -i <input_folder> [-o <output_file>]
+  ${SCRIPT_NAME} -h | -x
+Options:
+  -i  folder to check
+  -o  result file (default is '${output_file}')
+  -h  this help
+  -x  advanced options with their default arguments
+See also:
+  man ${SCRIPT_NAME}
+  https://avpres.net/Bash_AVpres/
+About:
+  Abstract: Find missing files in a folder of sequentially numbered files.
+  Version:  ${VERSION}
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# print advanced options with their default arguments and exit with status 0
+print_options() {
+  echo "$(date_time) print options" >> "${LOG_FILE}"
+  cat << EOF
+
+Advanced option with its default argument:
+  --output_file='${output_file}'
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# verify input (and normalise path if needed)
+verify_input() {
+  local in_path="${1}"
+
+  echo "$(date_time) verify input" >> "${LOG_FILE}"
+  if [[ ! "${in_path}" ]]; then
+    abort "Error: No input folder provided via '-i' or '--input'."
+  elif [[ ! -d "${in_path}" ]]; then
+    abort "Error: '${in_path}' is not a folder."
+  elif [[ "${in_path%/*}" == "${in_path}" ]]; then
+    input_folder="${PWD}/${in_path}"
+  fi
+  if [[ ! $(ls -A "${in_path}") || $(ls -A "${in_path}") == '.DS_Store' ]]; then
+    abort "Error: '${in_path}' is empty."
+  fi
+
+  return 0
+}
+
+
+# verify output
+verify_output() {
+  local out_file="${1}"
+
+  echo "$(date_time) verify output" >> "${LOG_FILE}"
+  if ! : > "${out_file}" &> /dev/null; then
+    abort "Error: Cannot create an output file '${out_file}'."
+  fi
+
+  return 0
+}
+
+
+# check files in folder
+check_files() {
+  local in_folder="${1}"
+  local out_file="${2}"
+  local first_file
+  local last_file
+  local first_number
+  local last_number
+  local filename_regex
+  local tmp
+
+  echo "$(date_time) check files in folder" >> "${LOG_FILE}"
+  echo -e "${BLUE}Please wait while verifying...${NC}"
+  first_file=$(ls "${in_folder}" | sort | head -n 1)
+  first_number=$(echo "${first_file}" | grep -oE '_[0-9]+\.' | grep -oE '[0-9]+')
+  if [[ ! "${first_number}" ]]; then
+    first_number=$(echo "${first_file}" | grep -oE '[0-9]+')
+  fi
+  if ! [[ "${first_number}" =~ ^[0-9]+$ ]]; then
+    rm "${out_file}"
+    abort "Error: '${first_file}' is not a valid first file."
+  fi
+  last_file=$(ls "${in_folder}" | sort | tail -n 1)
+  last_number=$(echo "${last_file}" | grep -oE '_[0-9]+\.' | grep -oE '[0-9]+')
+  if [[ ! "${last_number}" ]]; then
+    last_number=$(echo "${last_file}" | grep -oE '[0-9]+')
+  fi
+  if ! [[ "${last_number}" =~ ^[0-9]+$ ]]; then
+    rm "${out_file}"
+    abort "Error: '${last_file}' is not a valid last file."
+  fi
+  if [[ "${first_number}" > "${last_number}" ]]; then
+    rm "${out_file}"
+    abort "Error: The numbering of '${in_folder}' is not valid."
+  fi
+  if [[ "${first_number}" == $(basename "${first_file%.*}") ]]; then
+    filename_regex="${in_folder}/%0${#first_number}d.${first_file##*.}"
+  else
+    filename_regex="${in_folder}/${first_file%_*}_%0${#first_number}d.${first_file##*.}"
+  fi
+
+  for ((f=((10#${first_number})); f<=((10#${last_number})); f++)); do
+    tmp=$(printf "${filename_regex}" "$f")
+    if [[ ! -e "${tmp}" ]]; then
+      basename "${tmp}" >> "${out_file}"
+      echo -e "${RED}${tmp} is missing.${NC}"
+    fi
+  done
+
+  if [[ ! -s "${out_file}" ]]; then
+    rm "${out_file}"
+    echo -e "${BLUE}All files are present in '$(basename "${input_folder}")'.${NC}"
+    echo "All files of the intervall from '${first_number}' to '${last_number}' are present." >> "${LOG_FILE}"
+  else
+    echo "The following files of the intervall from '${first_number}' to '${last_number}' are missing:" >> "${LOG_FILE}"
+    cat "${output_file}" | sed 's/^/  /' >> "${LOG_FILE}"
+  fi
+
+  return 0
+}
+
+
+# parse and process provided input
+(( $# == 0 )) && print_prompt
+while getopts ":i:o:-:hx" opt; do
+  case "${opt}" in
+    i) if [[ "${OPTARG:0:1}" == '-' ]]; then
+         abort "Error: The option '-i' requires an argument."
+       else
+         input_folder="${OPTARG}"
+       fi ;;
+    o) if [[ "${OPTARG:0:1}" == '-' ]]; then
+         abort "Error: The option '-o' requires an argument."
+       else
+         output_file="${OPTARG}"
+       fi ;;
+    -) case "${OPTARG}" in
+         input=?*) input_folder="${OPTARG#*=}" ;;
+         output=?*) output_file="${OPTARG#*=}" ;;
+         help) print_help ;;
+         options) print_options ;;
+         *) abort "Error: The option '--${OPTARG}' is not valid." ;;
+       esac ;;
+    h) print_help ;;
+    x) print_options ;;
+    :) abort "Error: The option '-${OPTARG}' requires an argument." ;;
+    *) abort "Error: The option '-${OPTARG}' is not valid." ;;
+  esac
+done
+
+
+# verify input folder
+verify_input "${input_folder}"
+
+# verify output file
+if [[ "${output_file}" == "<folder>_missing.txt" ]]; then
+  output_file="${input_folder}_missing.txt"
+fi
+verify_output "${output_file}"
+
+# check files in folder
+check_files "${input_folder}" "${output_file}"
+
+# end log file
+echo "$(date_time) END" >> "${LOG_FILE}"
+
+if [[ -f "${output_file}" ]]; then
+  exit 1
+fi

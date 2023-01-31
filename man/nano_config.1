@@ -1,0 +1,70 @@
+.TH "nano_config" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+nano_config - Manage the local Nano configuration files.
+.SH SYNOPSIS
+\fBnano_config -l\fR | (\fB-a\fR|\fB-d\fR|\fB-i\fR|\fB-p\fR) [\fIconfig_file\fR]
+.LP
+.B nano_config -h
+.SH DESCRIPTION
+\fBnano_config\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBnano_config\fR. It manages the Nano configuration files:
+.Sp
+.Vb 1
+\&    <syntax>.nanorc
+\&    nanorc
+.Ve
+.Sp
+in the folder:
+.Sp
+.Vb 1
+\&    ${HOME}/.config/nano/
+.Ve
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTIONS
+.TP 4
+.B -l, --list
+list the installed local Nano configuration files
+.TP
+\fB-a \fR[\fIconfig_file\fR], \fB--add=\fIconfig_file
+add a local Nano configuration file
+.TP
+\fB-d \fR[\fIconfig_file\fR], \fB--delete=\fIconfig_file
+delete a local Nano configuration file
+.TP
+\fB-i \fR[\fIconfig_file\fR], \fB--init=\fIconfig_file
+initialise the local Nano configuration files
+.Sp
+Please do not use this option yet, unless you know exactly what you are doing.
+.TP
+\fB-p \fR[\fIconfig_file\fR], \fB--print=\fIconfig_file
+print a local Nano configuration file
+.SS INFORMATIVE OPTION
+.TP 4
+.B -h, --help
+display a help message
+.SH COPYRIGHT
+Copyright (c) 2017-2023 by Reto Kromer
+.SH LICENSE
+The \fBnano_config\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBnano_config\fR Bash script is provided "as is" without warranty or support of any kind.

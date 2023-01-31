@@ -1,0 +1,120 @@
+.TH "ffmpeg_head" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+ffmpeg_head - Install, patch or delete the current FFmpeg HEAD
+.SH SYNOPSIS
+\fBffmpeg_head -r\fR | \fB-t\fR | \fB-d
+.LP
+\fBffmpeg_head\fR [\fIadvanced_options\fR] (\fB-R\fR|\fB-T\fR) \fIpatch\fR ...
+.LP
+\fBffmpeg_head -h\fR | \fB-x
+.SH DESCRIPTION
+\fBBash AVpres\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBffmpeg_head\fR. It installs or deletes the current FFmpeg HEAD. A patch or a set of patches can be applied to the source code before compilation. The three commands \fBffmpeg\fR, \fBffplay\fR and \fBffprobe\fR can be installed either at root (for current usage) or on the Desktop (which is intended mainly for testing purposes).
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTIONS
+.TP 4
+.B -r, --root
+install the FFmpeg commands at root
+.TP
+.B -t, --test
+install the FFmpeg commands at '${HOME}/Desktop'
+.TP
+.B -d, --delete
+delete the FFmpeg HEAD folder
+.Sp
+Note that the \fBffmpeg\fR, \fBffplay\fR and \fBffprobe\fR commands are removed on the desktop, but not on root.
+.SS ADVANCED OPTIONS
+.TP 4
+\fB-R \fIpatch\fR ..., \fB--patch_root=\fIpatch\fR ...
+apply a patch or a patch set, and install the FFmpeg commands at root
+.Sp
+The \fIpatch\fR can be either a single patch, or a set of patches separated by spaces, or a folder containing one or more patches.
+.TP
+\fB-T \fIpatch\fR ..., \fB--patch_test=\fIpatch\fR ...
+apply a patch or a patch set, and install the FFmpeg commands at '${HOME}/Desktop'
+.Sp
+The \fIpatch\fR can be either a single patch, or a set of patches separated by spaces, or a folder containing one or more patches.
+.TP
+The following three special options, when needed, must be passed before one of the previous two advanced mode and patch options.
+.TP
+\fB--config=\fIconfig_file
+path to an external configuration file
+.Sp
+This allows to play with different configuration files, which may be useful for testing purposes.
+.TP
+\fB--source_folder=\fIsource_folder
+path where the source folder is cloned
+.Sp
+Note that a different path rather than the default '${HOME}/FFMPEG_HEAD' can be chosen also without patching (i.e. using the basic options \fB-r\fR, \fB--root\fR, \fB-t\fR, \fB--test\fR, \fB-d\fR and \fB--delete\fR).
+.TP
+\fB--patch_local=\fR(\fIyes\fR|\fIno\fR)
+By default, the current head is downloaded and patched. The option \fB--patch_local=yes\fR allow to patch the already downloaded repository, rather than to download it. Of course, this results in an error, when the patch is not consistent with the local folder.
+.SS INFORMATIVE OPTIONS
+.TP 4
+.B -h, --help
+display a help message
+.TP
+.B -x, --options
+display the commands used for compilation and their default values
+.SH NOTES
+.SS CONFIGURATION FILE
+.TP 4
+An external configuration file
+.Sp
+.Vb 1
+\&${HOME}/.config/AVpres/Bash_AVpres/ffmpeg_head.txt
+.Ve
+.TP
+can be defined, allowing the script to import alternate default values for the following options:
+.Sp
+.Vb 1
+\&config
+\&source_folder
+\&patch_local
+.Ve
+.SS LOG FILES
+.TP 4
+Temporary log files are stored at
+.Sp
+.Vb 1
+\&/tmp/AVpres/ffmpeg_head.XXXXXXXXXX
+.Ve
+.TP
+The log files can be used for debugging, for example by running \fBcat\fR on the address prompted with fatal error messages:
+.Sp
+.Vb 1
+\&cat /tmp/AVpres/ffmpeg_head.XXXXXXXXXX
+.Ve
+.SH SEE ALSO
+.TP 4
+FFmpeg website
+.br
+https://ffmpeg.org
+.TP
+\fBcc\fR(1), \fBgit\fR(1) and \fBmake\fR(1); \fBnasm\fR(1) or \fByasm\fR(1).
+.SH COPYRIGHT
+Copyright (c) 2003-2023 by Reto Kromer
+.SH LICENSE
+The \fBffmpeg_head\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBffmpeg_head\fR Bash script is provided "as is" without warranty or support of any kind.

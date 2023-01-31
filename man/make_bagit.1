@@ -1,0 +1,211 @@
+.TH "make_bagit" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+make_bagit - Create a BagIt archive of a folder, according to RFC 8493
+.SH SYNOPSIS
+\fBmake_bagit -b \fIinput_folder\fR | \fB-i \fIinput_folder\fB -o \fIoutput_folder
+.LP
+\fBmake_bagit -h\fR | \fB-x
+.SH DESCRIPTION
+\fBBash AVpres\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBmake_bagit\fR. It creates an archive of a folder, according to the "BagIt File Packaging Format", as designed by the Library of Congress in the U.S.A. and standardised under RFC 8493.
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTIONS
+.TP 4
+\fB-b \fIinput_folder\fB, --bagit=\fIinput_folder
+input folder
+.Sp
+This replaces the \fIinput_folder\fR by its BagIt archive, containing the original folder, and is faster.
+.TP
+\fB-i \fIinput_folder\fB, --input=\fIinput_folder
+input folder
+.TP
+\fB-o \fIoutput_folder\fB, --output=\fIoutput_folder
+output BagIt folder
+.Sp
+This copies the content of the \fIinput_folder\fR into the \fIoutput_folder\fR while creating a BagIt archive, and requires more time.
+.SS ADVANCED OPTIONS
+.TP 4
+The arguments of the advanced options can be overwritten by the user, either by passing a different value when calling the script, or by setting it in the configuration file. Please remember that any string containing spaces must be quoted or its spaces must be escaped.
+.TP
+\fB--bagit_version=\fIbagit_version
+RFC 8493 defines BagIt version 1.0 and \fBmake_bagit\fR uses this by default:
+.br
+.Vb 1
+\&    \fB--bagit_version=1.0
+.Ve
+.Sp
+For compatibility reasons, however, the values from 0.93 to 0.97 are also considered valid and supported.
+.TP
+\fB--bag_info=\fItext_file
+include additional informations into 'bag-info.txt', without any verification
+.TP
+\fB--fetch=\fItext_file
+include into the BagIt archive a 'fetch.txt' file, without any verification
+.TP
+\fB--algorithm=\fR(\fImd5\fR|\fIsha1\fR|\fIsha256\fR|\fIsha512\fR|\fIxxh128\fR|\fIxxh64\fR|\fIxxh32\fR|\fIcrc32\fR)
+RFC 8493 considers the four unkeyed cryptographic hash functions MD5, SHA-1, SHA-256 and SHA-512, which is the default:
+.br
+.Vb 1
+\&    \fB--algorithm=sha512
+.Ve
+.Sp
+\fBmake_bagit\fR and \fBverify_bagit\fR support all four hash algorithms, but the use of different and/or multiple algorithms in the same BagIt archive is currently not supported.
+.Sp
+In addition, \fBmake_bagit\fR and \fBverify_bagit\fR also support the four non-cryptographic algorithm \fIxxh128\fR, \fIxxh64\fR, \fIxxh32\fR and \fIcrc32\fR. Please note that this does not follow the RFC 8493 specification at all!
+.Sp
+The algorithm name can be passed in upper or lower case letters.
+.TP
+\fB--with_scripts=\fR(\fIyes\fR|\fIno\fR)
+include or not the \fBmake_bagit\fR, \fBverify_bagit\fR and \fBundo_bagit\fR scripts into the BagIt archive (default is \fIno\fR)
+.TP
+The script needs an external command to compute recursively the hash checksums of all elements inside the folder.
+.TP
+.B --md5='/bin/md5sum'
+MD5 command
+.TP
+.B --sha1='/bin/sha1sum'
+SHA-1 command
+.TP
+.B --sha256='/bin/sha256sum'
+SHA-256 command
+.TP
+.B --sha512='/bin/sha512sum'
+SHA-512 command
+.TP
+\fB--cp=\fIcopy_tool
+The script needs a copy command when the \fB-i\fR or \fB--input\fR and \fB-o\fR or \fB--output\fR options are used.
+.Sp
+By default, \fBgcp\fR is used rather than the classic \fBcp\fR, because the GNU flavour offers more possibilities, such as preserving the files' original date and time metadata. The default configuration is:
+.Sp
+.Vb 1
+\&    --cp='/bin/gcp --preserve=mode,timestamps -r'
+.Ve
+.TP
+\fB--exclusion=(\fIfile_list\fB)
+The exclusion \fIfile_list\fR is defined as an array and its default value is:
+.Sp
+.Vb 1
+\&    exclusion=('.DS_Store' 'desktop.ini')
+.Ve
+.Sp
+To avoid any exclusion, use an empty array:
+.Sp
+.Vb 1
+\&    exclusion=()
+.Ve
+.SS INFORMATIVE OPTIONS
+.TP 4
+.B -h, --help
+display a help message
+.TP
+.B -x, --options
+display the advanced options with their default arguments
+.SH NOTES
+.SS BAGIT ARCHIVE STRUCTURE
+.TP 4
+The structure of a BagIt archive is:
+.Sp
+.Vb 1
+\&bagit.txt
+\&data/<archive_content>
+\&manifest-<algorithm>.txt
+\&[bag-info.txt]
+\&[fetch.txt]
+\&[tagmanifest-<algorithm>.txt]
+.Ve
+.TP
+Only the 'bagit.txt' and 'manifest-<algorithm>.txt' files are mandatory, in addition to the 'data' folder, which contains the actual content of the archive.
+.TP
+According to RFC 8493, the 'bag-info.txt' and 'tagmanifest-<algorithm>.txt' files are optional and \fBmake_bagit\fR creates these always. The 'bag-info.txt' file contains metadata elements describing the bag and its payload and is intended primarily for human use. Yet the 'Payload-Oxum' metadata is used by \fBverify_bagit\fR to quickly detect incomplete bags, before performing any checksum validation. The 'tagmanifest-<algorithm>.txt' file contains the checksum manifest of all the other files generated.
+.TP
+The optional 'fetch.txt' file without any verification can be included in a BagIt archive with \fBmake_bagit\fR. Only its presence can be checked with \fBverify_bagit\fR.
+.TP
+In addition, for sustainability and transparency reasons, \fBmake_bagit\fR can embed its own source code as well as \fBverify_bagit\fR and \fBundo_bagit\fR ones into the BagIt folder: 'make_bagit.txt' is the script used to actually generate the BagIt archive and 'verify_bagit.txt' can be used to check its integrity. The action of \fBmake_bagit\fR can be reverted by the \fBundo_bagit\fR command, embedded as 'undo_bagit.txt'. The embedding can be activated by passing the \fB--with_scripts='yes'\fR option.
+.TP
+Note that by default the '.DS_Store' files generated by macOS and the 'desktop.ini' files generated by Windows are deleted before the BagIt archive is created. You can modify the default exclusion file list in the configuration file or by passing the \fB--exclusion=()\fR option.
+.TP
+Any space in folder and file names is replaced by an underscore sign before the BagIt archive is created.
+.SS CONFIGURATION FILE
+.TP 4
+An external configuration file
+.Sp
+.Vb 1
+\&${HOME}/.config/AVpres/Bash_AVpres/make_bagit.txt
+.Ve
+.TP
+can be defined, allowing the script to import alternate default values for the following options:
+.Sp
+.Vb 1
+\&bagit_version
+\&algorithm
+\&md5
+\&sha1
+\&sha256
+\&sha512
+\&cp
+\&with_scripts
+\&exclusion
+.Ve
+.SS LOG FILES
+.TP 4
+Temporary log files are stored at
+.Sp
+.Vb 1
+\&/tmp/AVpres/make_bagit.XXXXXXXXXX
+.Ve
+.TP
+The log files can be used for debugging, for example by running \fBcat\fR on the address prompted with fatal error messages:
+.Sp
+.Vb 1
+\&cat /tmp/AVpres/make_bagit.XXXXXXXXXX
+.Ve
+.SH SEE ALSO
+.TP 4
+\fBRFC 8493\fR, "The BagIt File Packaging Format (V1.0)", October 2018
+.br
+https://www.rfc-editor.org/info/rfc8493
+.TP
+\fBRFC 1321\fR, "The MD5 Message-Digest Algorithm", April 1992
+.br
+https://www.rfc-editor.org/info/rfc1321
+.TP
+\fBRFC 3174\fR, "US Secure Hash Algorithm (SHA1)", September 2001
+.br
+https://www.rfc-editor.org/info/rfc3174
+.TP
+"Descriptions of SHA-256, SHA-384, and SHA-512"
+.br
+https://web.archive.org/web/20130526224224/http://csrc.nist.gov/
+.br
+groups/STM/cavp/documents/shs/sha256-384-512.pdf
+.TP
+\fBmodify_bagit\fR(1), \fBundo_bagit\fR(1), \fBupdate_bagit\fR(1) and \fBverify_bagit\fR(1).
+.TP
+\fBmd5sum\fR(1), \fBsha1sum\fR(1), \fBsha256sum\fR(1) and \fBsha512sum\fR(1).
+.SH COPYRIGHT
+Copyright (c) 2014-2023 by Reto Kromer
+.SH LICENSE
+The \fBmake_bagit\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBmake_bagit\fR Bash script is provided "as is" without warranty or support of any kind.
+

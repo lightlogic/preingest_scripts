@@ -1,0 +1,104 @@
+.TH "missing_files" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+missing_files - Find missing files in a folder of sequentially numbered files
+.SH SYNOPSIS
+\fBmissing_files\fR \fB-i \fIinput_folder\fR [\fB-o \fIoutput_file\fR]
+.LP
+\fBmissing_files -h\fR | \fB-x
+.SH DESCRIPTION
+\fBBash AVpres\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBmissing_files\fR, which finds the missing files in a folder of sequentially numbered files.
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTIONS
+.TP 4
+\fB-i \fIinput_folder\fR, \fB--input=\fIinput_folder
+input folder to analyse
+.Sp
+The script extracts the regular expressions ("regex") for processing all the files and determines the actual number of the first and the last frame. The naming must follow one of the two formats:
+.Sp
+.Vb 1
+\&    path/to/filename_digits.extension
+\&    path/to/digits.extension
+.Ve
+.Sp
+where \fIdigits\fR is the numbering, which must be either alone or at the end of the filename, divided by an underscore from the rest of the filename and by a period from the extension (the filename can contain other underscore signs). The numbering can start at any number and the script verifies if all successive frames are present, from the beginning to the end of the interval.
+.TP
+\fB-o \fIoutput_file\fR, \fB--output=\fIoutput_file
+If there are missing files, then their filenames are written to the output file; otherwise no output file is generated.
+.Sp
+If this parameter is not passed, then the script uses
+.br
+.Vb 1
+\&    <input_folder>_missing.txt
+.Ve
+.SS INFORMATIVE OPTIONS
+.TP 4
+.B -h, --help
+display a help message
+.TP
+.B -x, --options
+display the advanced options with their default arguments
+.SH USAGE
+.TP 4
+The possibly generated file can be used, for example, to copy the missing frames from the source folder to the analysed \fIinput_folder\fR in an automated way:
+.Sp
+.Vb 1
+\&for f in $(cat <input_folder>_missing.txt); do
+\&  cp -v "<source_folder>/${f}" "<input_folder>"
+\&done
+.Ve
+.SH NOTES
+.TP 4
+Note that the script verifies the presence of all the sequentially numbered filenames in an interval, but not the content of those files (for this checksums are needed, and their use is highly recommended). For obvious reasons, missing frames at the very beginning or end of the interval cannot be detected.
+.SS CONFIGURATION FILE
+.TP 4
+An external configuration file
+.Sp
+.Vb 1
+\&${HOME}/.config/AVpres/Bash_AVpres/missing_files.txt
+.Ve
+.TP
+can be defined, allowing the script to import alternate default value for the following option:
+.Sp
+.Vb 1
+\&output_file
+.Ve
+.SS LOG FILES
+.TP 4
+Temporary log files are stored at
+.Sp
+.Vb 1
+\&/tmp/AVpres/missing_files.XXXXXXXXXX
+.Ve
+.TP
+The log files can be used for debugging, for example by running \fBcat\fR on the address prompted with fatal error messages:
+.Sp
+.Vb 1
+\&cat /tmp/AVpres/missing_files.XXXXXXXXXX
+.Ve
+.SH COPYRIGHT
+Copyright (c) 2004-2023 by Reto Kromer
+.SH LICENSE
+The \fBffmpeg_head\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBffmpeg_head\fR Bash script is provided "as is" without warranty or support of any kind.

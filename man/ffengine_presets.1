@@ -1,0 +1,145 @@
+.TH "ffengine_presets" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+ffengine_presets - List, install, delete or print 'FFCommand Engine' presets
+.SH SYNOPSIS
+\fBffengine_presets -l\fR | (\fB-i\fR|\fB-d\fR|\fB-p\fR) [\fIpreset\fR]
+.LP
+\fBffengine_presets -h\fR | \fB-x
+.SH DESCRIPTION
+\fBBash AVpres\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBffengine_presets\fR. It manages the FFmpeg recipe presents for the 'FFCommand Engine' by Thomas Aschenbach from Colorlab.
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTIONS
+.TP 4
+.B -l, --list
+list the installed 'FFCommand Engine' presets
+.TP
+\fB-i \fR[\fIpreset\fR], \fB--install\fR [\fIpreset\fR], \fB--install=\fIpreset
+install a new preset into 'FFCommand Engine' or replace an existing one
+.Sp
+If the preset is \fIAVpres\fR or \fIffmprovisr\fR, then \fBffengine_presets\fR retrieves the current version from the avpres.net website or the AMIA Open Source repository on GitHub, and installs it.
+.TP
+\fB-d \fR[\fIpreset\fR], \fB--delete\fR [\fIpreset\fR], \fB--delete=\fIpreset
+delete a preset from 'FFCommand Engine'
+.TP
+\fB-p \fR[\fIpreset\fR], \fB--print\fR [\fIpreset\fR], \fB--print=\fIpreset
+print a preset of 'FFCommand Engine'
+.SS ADVANCED OPTIONS
+.TP 4
+\fB--label=\fIlabel
+By default the filename of a passed preset file is used as label name for 'FFCommand Engine' menu. If the file
+.Sp
+.Vb 1
+\&    path/to/filename.extension
+.Ve
+.Sp
+is passed, then the label name
+.Sp
+.Vb 1
+\&    filename
+.Ve
+.Sp
+is used.
+.Sp
+The label name can contain upper and lower case letters (ASCII printable characters), digits, underscore signs and dashes.
+.TP
+\fB--output_file=\fIoutput_file
+This option is used to specify the output file when a preset is exported. If the passed path is not vaild, then the preset is silently written to a file on the Desktop:
+.Sp
+.Vb 1
+\&    ${HOME}/Desktop/${preset}.txt
+.Ve
+.Sp
+If no output file is passed, then the preset is prompted to the Terminal.
+.TP
+\fB--confirmation=\fR(\fIyes\fR|\fIno\fR)
+By default, the script demands confirmation from the user before installing, replacing or removing a preset. The option \fB--confirmation=no\fR avoids it, which is useful when the script is run in a batch process and/or chain of scripts.
+.SS INFORMATIVE OPTIONS
+.TP 4
+.B -h, --help
+display a help message
+.TP
+.B -x, --options
+display the advanced options with their default arguments
+.SH NOTES
+.TP 4
+The preset names \fIAVpres\fR and \fIffmprovisr\fR are reserved for those specific presets.
+.SS PRESET FILE FORMAT
+.TP 4
+The preset format consists in a text file of line pairs: a line starting with the number sign (#) explains what the command does, followed by a line with is the actual command:
+.Sp
+.Vb 1
+\&# title 1
+\&ffmpeg command 1
+\&     . . .
+\&# title n
+\&ffmpeg command n
+.Ve
+.TP
+Currently, 'FFCommand Engine' can handle \fBffmpeg\fR and \fBffprobe\fR commands, but not \fBffplay\fR ones.
+.SS CONFIGURATION FILE
+.TP 4
+An external configuration file
+.Sp
+.Vb 1
+\&${HOME}/.config/AVpres/Bash_AVpres/ffengine_presets.txt
+.Ve
+.TP
+can be defined, allowing the script to import alternate default values for the following options:
+.Sp
+.Vb 1
+\&confirmation
+\&label
+.Ve
+.SS LOG FILES
+.TP 4
+Temporary log files are stored at
+.Sp
+.Vb 1
+\&/tmp/AVpres/ffengine_presets.XXXXXXXXXX
+.Ve
+.TP
+The log files can be used for debugging, for example by running \fBcat\fR on the address prompted with fatal error messages:
+.Sp
+.Vb 1
+\&cat /tmp/AVpres/ffengine_presets.XXXXXXXXXX
+.Ve
+.SH SEE ALSO
+.TP 4
+FFCommand Engine
+.br
+https://github.com/ColorlabMD/FFCommand_Engine
+.TP
+FFmpeg Cookbook for Archivists
+.br
+https://avpres.net/FFmpeg/
+.TP
+Repository of useful FFmpeg commands for archivists
+.br
+https://amiaopensource.github.io/ffmprovisr/
+.SH COPYRIGHT
+Copyright (c) 2019-2023 by Reto Kromer
+.SH LICENSE
+The \fBffengine_presets\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBffengine_presets\fR Bash script is provided "as is" without warranty or support of any kind.

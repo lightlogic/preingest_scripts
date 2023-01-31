@@ -1,0 +1,95 @@
+.TH "undo_bagit" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+undo_bagit - Undo a BagIt archive folder, as defined in RFC 8493
+.SH SYNOPSIS
+\fBundo_bagit\fR (\fB-i\fR|\fB-b\fR) \fIinput_folder
+.LP
+\fBundo_bagit -h\fR | \fB-x
+.SH DESCRIPTION
+\fBBash AVpres\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBundo_bagit\fR. It undoes an archive which was generated according to the "BagIt File Packaging Format", as designed by the Library of Congress in the U.S.A. and standardised under RFC 8493. In particular, it reverts the action of the \fBmake_bagit\fR command: it removes the checksum manifests and the informative files and move the contents of the data directory up one level.
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTION
+.TP 4
+\fB-i \fIinput_folder\fB, --input=\fIinput_folder
+input BagIt folder
+.TP
+\fB-b \fIinput_folder\fB, --bagit=\fIinput_folder
+input BagIt folder
+.sp
+Note that \fB-b\fR and \fB--bagit\fR are aliases of \fB-i\fR and \fB--input\fR.
+.SS ADVANCED OPTIONS
+.TP 4
+\fB--confirmation=\fR(\fIyes\fR|\fIno\fR)
+By default, the script demands confirmation from the user before undoing a BagIt archive. The option \fB--confirmation=no\fR avoids it, which is useful when the script is run in a batch process and/or chain of scripts.
+.TP
+\fB--force=\fR(\fIyes\fR|\fIno\fR)
+By default, the script cannot undo an incomplete BagIt archive and returns an error message. The option \fB--force=yes\fR forces the processing of an incomplete BagIt archive.
+.SS INFORMATIVE OPTIONS
+.TP 4
+.B -h, --help
+display a help message
+.TP
+.B -x, --options
+display the advanced options with their default arguments
+.SH NOTES
+.SS CONFIGURATION FILE
+.TP 4
+An external configuration file
+.Sp
+.Vb 1
+\&${HOME}/.config/AVpres/Bash_AVpres/undo_bagit.txt
+.Ve
+.TP
+can be defined, allowing the script to import alternate default values for the following options:
+.Sp
+.Vb 1
+\&confirmation
+\&force
+.Ve
+.SS LOG FILES
+.TP 4
+Temporary log files are stored at
+.Sp
+.Vb 1
+\&/tmp/AVpres/undo_bagit.XXXXXXXXXX
+.Ve
+.TP
+The log files can be used for debugging, for example by running \fBcat\fR on the address prompted with fatal error messages:
+.Sp
+.Vb 1
+\&cat /tmp/AVpres/undo_bagit.XXXXXXXXXX
+.Ve
+.SH SEE ALSO
+.TP 4
+\fBRFC 8493\fR, "The BagIt File Packaging Format (V1.0)", October 2018
+.br
+https://www.rfc-editor.org/info/rfc8493
+.TP
+\fBmake_bagit\fR(1), \fBmodify_bagit\fR(1), \fBupdate_bagit\fR(1) and \fBverify_bagit\fR(1).
+.SH COPYRIGHT
+Copyright (c) 2014-2023 by Reto Kromer
+.SH LICENSE
+The \fBundo_bagit\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBundo_bagit\fR Bash script is provided "as is" without warranty or support of any kind.

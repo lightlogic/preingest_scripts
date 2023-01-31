@@ -1,0 +1,347 @@
+#!/usr/bin/env bash
+
+# Add, verify or remove a checksum as filename's suffix.
+#
+# Copyright (c) 2014-2023 by Reto Kromer <https://reto.ch>
+#
+# This Bash script is released under a 3-Clause BSD License and is provided
+# "as is" without warranty or support of any kind.
+
+
+# initialise constants
+VERSION='2022-12-31'
+SCRIPT_NAME="$(basename "$0")"
+CONFIG_FILE="${HOME}/.config/AVpres/Bash_AVpres/${SCRIPT_NAME}.txt"
+RED='\033[1;31m'
+BLUE='\033[1;34m'
+NC='\033[0m'
+
+# load configuration file if any and initialise default values
+[[ -f "${CONFIG_FILE}" ]] && . "${CONFIG_FILE}"
+default_algorithm="${default_algorithm:-xxh128}"
+crc32="${crc32:-$(which crc32)}"
+md5="${md5:-$(which md5sum)}"
+sha1="${sha1:-$(which sha1sum)}"
+sha256="${sha256:-$(which sha256sum)}"
+sha512="${sha512:-$(which sha512sum)}"
+xxh32="${xxh32:-$(which xxhsum) -H32}"
+xxh64="${xxh64:-$(which xxhsum) -H64}"
+xxh128="${xxh128:-$(which xxhsum) -H128}"
+confirmation="${confirmation:-yes}"
+
+# initialise another default value
+algorithm_regex='^(crc32|md5|sha1|sha256|sha512|xxh32|xxh64|xxh128)$'
+
+# initialise variables
+unset algorithm
+unset checksum
+unset hash_length
+unset input_path
+unset kbd
+unset mode
+
+
+# get date-and-time stamp
+date_time() {
+  TZ='UTC' date +'[%F %T %Z]'
+}
+
+
+# check that Bash 3.2 or later is running
+if ! printf '%s\n%s\n' "$(bash -c 'echo ${BASH_VERSION}')" "3.2" | sort -rVC; then
+  echo -e "${BLUE}Warning: This 'bash' binary is very old. Tested for version 3.2 or later.${NC}"
+fi
+
+# start log file
+[[ -d '/tmp/AVpres' ]] || mkdir -p '/tmp/AVpres'
+LOG_FILE="$(mktemp -q "/tmp/AVpres/${SCRIPT_NAME}.XXXXXXXXXX")"
+echo "$(date_time) ${SCRIPT_NAME} ${VERSION}" > "${LOG_FILE}"
+echo "$(date_time) $0 $*" >> "${LOG_FILE}"
+echo "$(date_time) START" >> "${LOG_FILE}"
+
+
+# print an error message and exit with status 1
+abort() {
+  echo -e "${RED}${1:-An unknown error occurred.\a}${NC}"
+  echo "$(date_time) ${1:-An unknown error occurred.}" >> "${LOG_FILE}"
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 1
+}
+
+
+# print a minimal help message and exit with status 0
+print_prompt() {
+  echo "$(date_time) print prompt" >> "${LOG_FILE}"
+  cat << EOF
+Help:
+  ${SCRIPT_NAME} -h
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# print the help message and exit with status 0
+print_help() {
+  echo "$(date_time) print help" >> "${LOG_FILE}"
+  cat << EOF
+
+Usage:
+  ${SCRIPT_NAME} (-a|-v|-r) <input_path>
+  ${SCRIPT_NAME} -h | -x
+Options:
+  -a  add checksum to filename
+  -v  verify if file's content and checksum matches
+  -r  remove checksum from filename
+  -h  this help
+  -x  advanced options with their default arguments
+Dependency:
+  xxhsum, md5sum, sha1sum, sha256sum, sha512sum and crc32
+See also:
+  man ${SCRIPT_NAME}
+  https://avpres.net/Bash_AVpres/
+About:
+  Abstract: Add, verify or remove a checksum as filename's suffix.
+  Version:  ${VERSION}
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# print advanced options with their default arguments and exit with status 0
+print_options() {
+  echo "$(date_time) print options" >> "${LOG_FILE}"
+  cat << EOF
+
+Advanced options with their default arguments:
+  --algorithm='${default_algorithm}'
+  --crc32='${crc32}'
+  --md5='${md5}'
+  --sha1='${sha1}'
+  --sha256='${sha256}'
+  --sha512='${sha512}'
+  --xxh32='${xxh32}'
+  --xxh64='${xxh64}'
+  --xxh128='${xxh128}'
+  --confirmation='${confirmation}'
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# check input
+check_input() {
+  local in_path="${1}"
+
+  if [[ ! "${in_path}" && "$*" ]]; then
+    abort "Error: The option '$*' is not valid."
+  elif [[ ! -d "${in_path}" && ! -f "${in_path}" ]]; then
+    abort "Error: '$(basename "${input_path}")' is not a folder nor a file."
+  fi
+
+  return 0
+}
+
+
+# check algorithm
+check_algorithm() {
+  local tmp_algo="${1}"
+
+  algorithm="$(echo "${tmp_algo}" | awk '{print tolower($0)}')"
+  if [[ "${algorithm}" && ! "${algorithm}" =~ ${algorithm_regex} ]]; then
+    abort "Error: '${tmp_algo}' is not a valid algorithm."
+  fi
+
+  return 0
+}
+
+
+# add checksum as suffix of the filename
+add_checksum() {
+  local in_file="${1}"
+  local new_file
+
+  if [[ ! "${algorithm}" ]]; then
+    algorithm="${default_algorithm}"
+  fi
+  check_algorithm "${algorithm}"
+  checksum=$(${!algorithm} "${in_file}" | awk '{print $1}')
+  (( $? != 0 )) && abort "Fatal error, see '${LOG_FILE}'."
+  new_file="${in_file%.*}_${checksum}.${in_file##*.}"
+  if ! mv "${in_file}" "${new_file}"; then
+    abort "Fatal error, see '${LOG_FILE}'."
+  fi
+  echo "$(date_time) $(basename "${new_file}")" >> "${LOG_FILE}"
+  echo "$(basename "${new_file}")"
+
+  return 0
+}
+
+
+# verify if checksum inside filename matches with file's content
+verify_checksum() {
+  local in_file="${1}"
+  local algo
+  local hash_length
+
+  # the algorithm is known
+  if [[ "${algorithm}" ]]; then
+    check_algorithm "${algorithm}"
+    hash_length=$(${!algorithm} <(echo) | awk '{print $1}' | awk '{print length}')
+    if echo "${in_file}" | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." &> /dev/null
+    then
+      if ! diff -b <(echo "${in_file}" \
+        | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." \
+        | grep -oE "[0-9A-Fa-f]{"${hash_length}"}") \
+        <(${!algorithm} "${in_file}" | awk '{print $1}') >> "${LOG_FILE}" 2>&1
+      then
+        abort "Error: '$(basename "${in_file}")' doesn't match."
+      else
+        echo "$(date_time) $(basename "${in_file}")" >> "${LOG_FILE}"
+        echo -e "${BLUE}$(basename "${in_file}")${NC}"
+        return 0
+      fi
+    else
+      echo "Warning: '${algorithm}' is not correct; trying to find the correct algorithm." \
+        | tee -a "${LOG_FILE}"
+    fi
+  fi
+
+  # the algorithm is unknown
+  for algo in {xxh128,md5,sha1,sha256,sha512,xxh32,xxh64,crc32}; do
+    hash_length=$(${!algo} <(echo) | awk '{print $1}' | awk '{print length}')
+    (( $? != 0 )) && abort "Fatal error, see '${LOG_FILE}'."
+    if echo "${in_file}" \
+      | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." &> /dev/null
+    then
+      echo "Trying '${algo}'" >> "${LOG_FILE}"
+      if ! diff -b <(echo "${in_file}" \
+        | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." \
+        | grep -oE "[0-9A-Fa-f]{"${hash_length}"}") \
+        <(${!algo} "${in_file}" | awk '{print $1}') >> "${LOG_FILE}" 2>&1
+      then
+        # because xxHash 128 and MD5 have the same hash length
+        if [[ "${algo}" == 'xxh128' ]]; then
+          continue
+        # because xxHash 32 and CRC-32 have the same hash length
+        elif [[ "${algo}" == 'xxh32' ]]; then
+          continue
+        else
+          abort "Error: '$(basename "${in_file}")' doesn't match."
+        fi
+      else
+        echo "$(date_time) $(basename "${in_file}")" >> "${LOG_FILE}"
+        echo -e "${BLUE}$(basename "${in_file}")${NC}"
+        return 0
+      fi
+    fi
+  done
+
+  abort "Error: No checksum in filename '$(basename "${in_file}")'"
+}
+
+
+# remove checksum from filename
+remove_checksum() {
+  local in_file="${1}"
+  local algo
+  local checksum
+  local new_file
+
+  for algo in {xxh128,sha1,sha256,sha512,xxh32,xxh64}; do
+    hash_length=$(${!algo} <(echo) | awk '{print $1}' | awk '{print length}')
+    (( $? != 0 )) && abort "Fatal error, see '${LOG_FILE}'."
+    if echo "${in_file}" \
+      | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." &> /dev/null
+    then
+      checksum="$(echo "${in_file}" \
+        | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." \
+        | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}")"
+      new_file="${in_file/"$checksum"/}"
+      if ! mv "${in_file}" "${new_file}"; then
+        abort "Fatal error, see '${LOG_FILE}'."
+      fi
+      echo "$(date_time) $(basename "${new_file}")" >> "${LOG_FILE}"
+      echo "$(basename "${new_file}")"
+      return 0
+    fi
+  done
+}
+
+
+# parse provided input
+(( $# == 0 )) && print_prompt
+while getopts ":a:v:r:-:hx" opt; do
+  case "${opt}" in
+    a) if [[ "${OPTARG:0:1}" == '-' ]]; then
+         abort "Error: The option '-a' requires an argument."
+       else
+         input_path="${OPTARG}"
+         mode='add'
+       fi ;;
+    v) if [[ "${OPTARG:0:1}" == '-' ]]; then
+         abort "Error: The option '-v' requires an argument."
+       else
+         input_path="${OPTARG}"
+         mode='verify'
+       fi ;;
+    r) if [[ "${OPTARG:0:1}" == '-' ]]; then
+         abort "Error: The option '-r' requires an argument."
+       else
+         input_path="${OPTARG}"
+         mode='remove'
+       fi ;;
+    -) case "${OPTARG}" in
+         add=?*) input_path="${OPTARG#*=}"; mode='add' ;;
+         verify=?*) input_path="${OPTARG#*=}"; mode='verify' ;;
+         remove=?*) input_path="${OPTARG#*=}"; mode='remove' ;;
+         algorithm=?*) algorithm="${OPTARG#*=}" ;;
+         crc32=?*) crc32="${OPTARG#*=}" ;;
+         md5=?*) md5="${OPTARG#*=}" ;;
+         sha1=?*) sha1="${OPTARG#*=}" ;;
+         sha256=?*) sha256="${OPTARG#*=}" ;;
+         sha512=?*) sha512="${OPTARG#*=}" ;;
+         xxh32=?*) xxh32="${OPTARG#*=}" ;;
+         xxh64=?*) xxh64="${OPTARG#*=}" ;;
+         xxh128=?*) xxh128="${OPTARG#*=}" ;;
+         confirmation?*) confirmation="${OPTARG#*=}" ;;
+         help) print_help ;;
+         options) print_options ;;
+         *) abort "Error: The option '--${OPTARG}' is not valid or requires an argument." ;;
+       esac ;;
+    h) print_help ;;
+    x) print_options ;;
+    :) abort "Error: The option '-${OPTARG}' requires an argument." ;;
+    *) abort "Error: The option '-${OPTARG}' is not valid." ;;
+  esac
+done
+
+# check provided input
+check_input "${input_path}"
+
+# ask confirmation before removing checksum
+if [[ "${mode}" == 'remove' && "${confirmation}" != 'no' ]]; then
+  echo -en "${BLUE}Remove checksum from filename? (y|N) ${NC}"
+  read -n 1 kbd
+  echo
+  if [[ "${kbd}" != [Yy] ]]; then
+    abort "Aborted by user."
+  fi
+fi
+
+# process provided input
+echo "$(date_time) ${mode} checksum" >> "${LOG_FILE}"
+find "${input_path}" -type f -print0 | while read -d $'\0' f; do
+  ${mode}_checksum "${f}"
+done
+
+# end log file
+if (( $? == 0 )); then
+  echo "$(date_time) END" >> "${LOG_FILE}"
+else
+  exit 1
+fi

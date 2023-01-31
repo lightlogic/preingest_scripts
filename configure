@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+
+# Bash AVpres configure script
+#
+# Copyright (c) 1991-2023 by Reto Kromer <https://reto.ch>
+#
+# This Bash script is released under a 3-Clause BSD License and is provided
+# "as is" without warranty or support of any kind.
+
+
+# initialise constants
+VERSION='2022-12-31'
+SCRIPT_NAME=$(basename "$0")
+CONFIG_FILE="${HOME}/.config/AVpres/Bash_AVpres/${SCRIPT_NAME}.txt"
+RED='\033[1;31m'
+BLUE='\033[1;34m'
+NC='\033[0m'
+
+# load configuration file if any and initialise default values
+[[ -f "${CONFIG_FILE}" ]] && . "${CONFIG_FILE}"
+PREFIX="${PREFIX:-/usr/local}"
+BINPREFIX="${BINPREFIX:-${PREFIX}/bin}"
+MANPREFIX="${MANPREFIX:-${PREFIX}/share/man/man1}"
+
+
+# print an error message and exit with status 1
+abort() {
+  echo -e "${RED}Error: ${1:-cannot generate a Makefile.\a}${NC}"
+  rm -f Makefile
+  exit 1
+}
+
+
+# print a help message and exit with status 0
+print_help() {
+  cat << EOF
+
+Usage:
+  ./configure --option=argument
+
+Options with their default arguments:
+  --prefix=${PREFIX}
+  --binprefix=${BINPREFIX}
+  --manprefix=${MANPREFIX}
+
+EOF
+
+  exit 0
+}
+
+
+# define variable and value pairs
+define() {
+  echo "${1} := ${2}" | tee -a Makefile
+}
+
+
+# parse provided input
+for o; do
+  opt="${o%%=*}"
+  arg="${o#*=}"
+  case "${opt}" in
+    --prefix) PREFIX="${arg}" ;;
+    --binprefix) BINPREFIX="${arg}" ;;
+    --manprefix) MANPREFIX="${arg}" ;;
+    --help) print_help ;;
+    *) abort "Option '${o}' is not valid." ;;
+  esac
+done
+
+# generate Makefile
+cat << EOF > Makefile
+#!/usr/bin/env make -f
+
+# Bash AVpres Makefile generated on $(TZ='UTC' date +'%F at %T %Z')
+#
+# Copyright (c) 1991-2023 by Reto Kromer <https://reto.ch>
+#
+# This make script is released under a 3-Clause BSD License and is provided
+# "as is" without warranty or support of any kind.
+
+EOF
+
+define PREFIX "${PREFIX}"
+define BINPREFIX "${BINPREFIX}"
+define MANPREFIX "${MANPREFIX}"
+
+cat << 'EOF' >> Makefile
+SHELL ?= /bin/sh
+RELEASE := $(shell cat VERSION)
+BIN := $(wildcard bin/*)
+MAN := $(wildcard man/*)
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+UNAME_P := $(shell uname -p)
+
+.PHONY: install uninstall info
+
+install: $(BIN) $(MAN)
+	@echo "Installing..."
+	for i in $(BIN); do cp $$i $(BINPREFIX); done
+	for j in $(MAN); do cp $$j $(MANPREFIX); done
+
+uninstall: $(BIN) $(MAN)
+	@echo "Uninstalling..."
+	for i in $(BIN:bin/%=%); do rm $(BINPREFIX)/$$i; done
+	for j in $(MAN:man/%=%); do rm $(MANPREFIX)/$$j; done
+
+info:
+	@echo
+	@echo "  This Makefile installs or uninstalls"
+	@echo "    Bash AVpres"
+	@echo "    version $(RELEASE)"
+	@echo "    for $(UNAME_S) on $(UNAME_M) with $(UNAME_P)"
+	@echo "  Reto Kromer"
+	@echo
+EOF

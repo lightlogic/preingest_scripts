@@ -1,0 +1,128 @@
+.TH "make_framemd5" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+make_framemd5 - Make a frame MD5 checksum manifest for an audio-visual file or single-image files in a folder
+.SH SYNOPSIS
+\fBmake_framemd5 -i \fIinput_path\fR [\fB-o \fIoutput_file\fR]
+.LP
+\fBmake_framemd5 -h\fR | \fB-x
+.SH DESCRIPTION
+\fBBash AVpres\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBmake_framemd5\fR. It creates manifest with an MD5 checksum for each frame of an audio-visual file or for each single-image file in a folder.
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTIONS
+.TP 4
+\fB-i \fIinput_path\fB, --input=\fIinput_path
+input file if stream-based content, or input folder if single-image-based content
+.Sp
+When a folder is passed, the script extracts the regular expressions ("regex") for processing all the files and determines the actual number of the first frame. The naming must follow one of the two formats:
+.Sp
+.Vb 1
+\&    path/to/filename_digits.extension
+\&    path/to/digits.extension
+.Ve
+.Sp
+where \fIdigits\fR is the numbering, which must be either alone or at the end of the filename, divided by an underscore from the rest of the filename and by a period from the extension (the filename can contain other underscore signs). The numbering can start at any number, but all successive frames must be present, from the beginning to the end of the interval. This can be verified by using the \fBmissing_files\fR script.
+.TP
+\fB-o \fIoutput_file\fB, --output=\fIoutput_file
+path to the manifest
+.Sp
+If this parameter is not passed, then the script uses
+.Sp
+.Vb
+\&    <input_path><suffix>.<extension>
+.Ve
+.SS ADVANCED OPTIONS
+.TP 4
+The default arguments of the advanced options can be overwritten by the user. To cancel a default argument use
+.Sp
+.Vb 1
+\&--<option>='#'
+.Ve
+.TP
+.B --ffmpeg='/bin/ffmpeg'
+path to the \fBffmpeg\fR command
+.TP
+.B --ffprobe='/bin/ffprobe'
+path to the \fBffprobe\fR command
+.TP
+.B --suffix='_framemd5'
+The suffix is inserted at the end of the filename, immediately before the period and the extension. Note that a preceding underscore, if wished, must be added.
+.Sp
+The suffix consists in upper and lower case letters as well as numbers.
+.TP
+.B --extension='txt'
+As the manifest is a text file the default value is 'txt'.
+.Sp
+The file extension consist in upper and lower case letters as well as numbers.
+.SS INFORMATIVE OPTIONS
+.TP 4
+.B -h, --help
+display a help message
+.TP
+.B -x, --options
+display the advanced options with their default arguments
+.SH NOTES
+.SS CONFIGURATION FILE
+.TP 4
+An external configuration file
+.Sp
+.Vb 1
+\&${HOME}/.config/AVpres/Bash_AVpres/make_framemd5.txt
+.Ve
+.TP
+can be defined, allowing the script to import alternate default values for the following options:
+.Sp
+.Vb 1
+\&ffmpeg_bin
+\&ffprobe_bin
+\&extension
+\&suffix
+.Ve
+.SS LOG FILES
+.TP 4
+Temporary log files are stored at
+.Sp
+.Vb 1
+\&/tmp/AVpres/make_framemd5.XXXXXXXXXX
+.Ve
+.TP
+The log files can be used for debugging, for example by running \fBcat\fR on the address prompted with fatal error messages:
+.Sp
+.Vb 1
+\&cat /tmp/AVpres/make_framemd5.XXXXXXXXXX
+.Ve
+.SH SEE ALSO
+.TP 4
+\fBRFC 1321\fR, "The MD5 Message-Digest Algorithm", April 1992
+.br
+https://www.rfc-editor.org/info/rfc1321
+.TP
+\fBverify_framemd5\fR(1).
+.TP
+\fBffmpeg\fR(1) and \fBffprobe\fR(1).
+.SH COPYRIGHT
+Copyright (c) 2012-2023 by Reto Kromer
+.SH LICENSE
+The \fBmake_framemd5\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBmake_framemd5\fR Bash script is provided "as is" without warranty or support of any kind.

@@ -1,0 +1,173 @@
+.TH "make_prores" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+make_prores - Generate a ProRes 422 or ProRes 4444 file
+.SH SYNOPSIS
+\fBmake_prores -i \fIinput_path\fB -o \fIoutput_file
+.LP
+\fBmake_prores -h\fR | \fB-x
+.SH DESCRIPTION
+\fBBash AVpres\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBmake_prores\fR. It encodes a video file or a folder containing single images into a ProRes 422 or 4444 stream and muxes it into a Matroska (".mkv" file), QuickTime (".mov" file) or Material eXchange Format (".mxf" file) container.
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTIONS
+.TP 4
+\fB-i \fIinput_path\fB, --input=\fIinput_path
+\fIinput_path\fR is a file if the content is stream based, or a folder if the content is single-image based
+.Sp
+When a folder is passed, the script extracts the regular expressions ("regex") for processing all the files and determines the actual number of the first frame. The naming must follow one of the two formats:
+.Sp
+.Vb 1
+\&    path/to/filename_digits.extension
+\&    path/to/digits.extension
+.Ve
+.Sp
+where \fIdigits\fR is the numbering, which must be either alone or at the end of the filename, divided by an underscore from the rest of the filename and by a period from the extension (the filename can contain other underscore signs). The numbering can start at any number, but all successive frames must be present, from the beginning to the end of the interval. This can be verified by using the \fBmissing_files\fR script.
+.TP
+\fB-o \fIoutput_file\fB, --output=\fIoutput_file
+output file
+.SS ADVANCED OPTIONS
+.TP 4
+The default arguments of the advanced options can be overwritten by the user. Please remember that any string containing spaces must be quoted, or its spaces must be escaped. To cancel a default argument use
+.Sp
+.Vb 1
+\&--<option>='#'
+.Ve
+.TP
+.B --ffmpeg='/bin/ffmpeg'
+path to the \fBffmpeg\fR command
+.TP
+.B --ffprobe='/bin/ffprobe'
+path to the \fBffprobe\fR command
+.TP
+.B --ff_glo_opt='-y'
+A possibly already existing output file is overwritten.
+.TP
+The following two input file default parameters are used only when single-image-based content is provided:
+.TP
+.B --f='image2'
+Probably this parameter should never be modified. It forces the use of the image file demuxer for the input.
+.TP
+\fB--framerate=\fIframerate
+The default frame rate for video is \fI25\fR. The standardised projection speed for sound films is \fI24\fR frames per second, which is the default value in \fBmake_prores\fR. Silent films or amateur films have often a different projection speed, for example \fI18\fR.
+.TP
+Video codec options with their default parameters:
+.TP
+\fB--c_v=\fR(\fIprores\fR|\fIprores_ks\fR)
+FFmpeg comes with two different ProRes encoders: \fIprores\fR and \fIprores_ks\fR which is the default. Both have been reverse engineered, because Apple is unwilling to disclose its ProRes 4444 and 422 format families.
+.TP
+\fB--profile_v=\fIvideo_profile_number
+Possible values are:
+.Sp
+.Vb 1
+\&    5 = ProRes 4444 XQ
+\&    4 = ProRes 4444
+\&    3 = ProRes 422 HQ  (default)
+\&    2 = ProRes 422
+\&    1 = ProRes 422 LT
+\&    0 = ProRes 422 Proxy
+.Ve
+.Sp
+The formats ProRes RAW HQ and ProRes RAW, introduced by Apple in 2018, are currently not supported by FFmpeg.
+.TP
+.B --filter_v=''
+This can be used, for example, to provide scaling and/or padding video filters.
+.TP
+Audio codec options with their default parameters:
+.TP
+.B --c_a='copy'
+If no sound stream is present, then the \fBffmpeg\fR parameter '-an' is used instead.
+.TP
+.B --filter_a=''
+This can be used to provide audio filters.
+.TP
+Output file default parameters:
+.TP
+.B --suffix='_prores'
+The suffix is inserted at the end of the filename, immediately before the period and the extension. Note that a preceding underscore, if wished, must be added.
+.TP
+\fB--extension=\fR(\fImkv\fR|\fImov\fR|\fImxf\fR)
+Possible containers are Quicktime (mov) and Matroska (mkv), while sadly Material eXchange Format (mxf) is not working yet in FFmpeg. Matroska is the default.
+.SS INFORMATIVE OPTIONS
+.TP 4
+.B -h, --help
+display a help message
+.TP
+.B -x, --options
+display the advanced options with their default arguments
+.SH NOTES
+.SS COMPATIBILITY
+The two FFmpeg's ProRes codec implementations have been back engineered. Therefore the resulting files are not the same that Apple's one would generate.
+.SS CONFIGURATION FILE
+.TP 4
+An external configuration file
+.Sp
+.Vb 1
+\&${HOME}/.config/AVpres/Bash_AVpres/make_prores.txt
+.Ve
+.TP
+can be defined, allowing the script to import alternate default values for the following options:
+.Sp
+.Vb 1
+\&ffmpeg_bin
+\&ffprobe_bin
+\&ff_glo_opt
+\&f
+\&framerate
+\&filter_v
+\&c_v
+\&profile_v
+\&filter_a
+\&c_a
+\&suffix
+\&extension
+.Ve
+.SS LOG FILES
+.TP 4
+Temporary log files are stored at
+.Sp
+.Vb 1
+\&/tmp/AVpres/make_prores.XXXXXXXXXX
+.Ve
+.TP
+The log files can be used for debugging, for example by running \fBcat\fR on the address prompted with fatal error messages:
+.Sp
+.Vb 1
+\&cat /tmp/AVpres/make_prores.XXXXXXXXXX
+.Ve
+.SH SEE ALSO
+.TP 4
+FFmpeg Cookbook for Archivists, entry "Video into ProRes"
+.br
+https://avpres.net/FFmpeg/im_ProRes
+.TP
+FFmpeg Cookbook for Archivists, entry "Image sequence into ProRes"
+.br
+https://avpres.net/FFmpeg/sq_ProRes
+.TP
+\fBffmpeg\fR(1) and \fBffprobe\fR(1).
+.SH COPYRIGHT
+Copyright (c) 2009-2023 by Reto Kromer
+.SH LICENSE
+The \fBmake_prores\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBmake_prores\fR Bash script is provided "as is" without warranty or support of any kind.

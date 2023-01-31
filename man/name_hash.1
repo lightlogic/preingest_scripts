@@ -1,0 +1,180 @@
+.TH "name_hash" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+name_hash - Add, verify or remove a checksum as a suffix of the filename
+.SH SYNOPSIS
+\fBname_hash\fR (\fB-a\fR|\fB-v\fR|\fB-r\fR) \fIinput_path
+.LP
+\fBname_hash -h\fR | \fB-x
+.SH DESCRIPTION
+\fBBash AVpres\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBname_hash\fR which can perform three different tasks:
+.PP
+- add a checksum to the filename;
+.br
+- verify if the integrated checksum matches the file content;
+.br
+- remove the checksum from the filename.
+.PP
+The format is:
+.br
+.Vb 1
+\&    path/to/filename_checksum.extension
+.Ve
+.PP
+The script dismisses the necessity of handling additional manifest files containing the checksums. It works with both a single file or all the files inside a folder recursively. Note that this is fully reversible and therefore adapting to an evolving archive's policy is not an issue.
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTIONS
+.TP 4
+\fB-a \fIinput_path\fB, --add=\fIinput_path
+path to a file or a folder
+.Sp
+Add the checksum as suffix of the filename.
+.TP
+\fB-v \fIinput_path\fB, --verify=\fIinput_path
+path to a file or a folder
+.Sp
+Verify if the checksum matches the file's content.
+.Sp
+Note that the verification is faster when the \fB--algorithm\fR option is provided, especially when MD5 or CRC-32 is used.
+.TP
+\fB-r \fIinput_path\fB, --remove=\fIinput_path
+path to a file or a folder
+.Sp
+Remove the filename's suffix containing the checksum.
+.SS ADVANCED OPTIONS
+.TP 4
+The arguments of the advanced options can be overwritten by the user. Please remember that any string containing spaces must be quoted, or its spaces must be escaped.
+.TP
+\fB--algorithm=\fR(\fIxxh32\fR|\fIxxh64\fR|\fIxxh128\fR|\fImd5\fR|\fIsha1\fR|\fIsha256\fR|\fIsha512\fR|\fIcrc32\fR)
+We advise to use a faster non-cryptographic hash functions, because we consider that, for archival purposes, there is no necessity to apply a more complex unkeyed cryptographic hash function. The algorithm name can be passed in upper or lower case letters.
+.Sp
+The default algorithm is xxHash 128:
+.br
+.Vb 1
+\&    --algorithm='xxh128'
+.Ve
+.Sp
+Note that until end of 2020 the default algorithm was MD5, which has the same checksum size than the xxHash 128 algorithm. Therefore, if you verify files with an MD5 checksum, then you may pass the option \fB--algorithm=md5\fR in order to speed-up the verification.
+.Sp
+Also xxHash 32 and CRC-32 have the same checksum size. If the algorithm is not specified, then xxHash 32 is checked before CRC-32.
+.TP
+The script needs external commands to compute the hash checksum of the files. Run either \fBname_hash -x\fR or \fBname_hash --options\fR to see the actual default tools on a specific computer.
+.TP
+.B --xxh32='/bin/xxhsum -H32'
+xxHash 32 command
+.TP
+.B --xxh64='/bin/xxhsum -H64'
+xxHash 64 command
+.TP
+.B --xxh128='/bin/xxhsum -H128'
+xxHash 128 command
+.TP
+.B --md5='/bin/md5sum'
+MD5 command
+.TP
+.B --sha1='/bin/sha1sum'
+SHA-1 command
+.TP
+.B --sha256='/bin/sha256sum'
+SHA-256 command
+.TP
+.B --sha512='/bin/sha512sum'
+SHA-512 command
+.TP
+.B --crc32='/bin/crc32'
+CRC-32 command
+.TP
+\fB--confirmation=\fR(\fIyes\fR|\fIno\fR)
+By default, the script demands confirmation from the user before removing any checksum. The option \fB--confirmation=no\fR avoids it, which is useful when the script is run in a batch process and/or chain of scripts.
+.SS INFORMATIVE OPTIONS
+.TP 4
+.B -h, --help
+display a help message
+.TP
+.B -x, --options
+display the advanced options with their default arguments
+.SH NOTES
+.TP 4
+It is possible to have multiple checksum suffixes, separated by an underscore, but \fBname_hash\fR considers always the last one.
+.SS CONFIGURATION FILE
+.TP 4
+An external configuration file
+.Sp
+.Vb 1
+\&${HOME}/.config/AVpres/Bash_AVpres/name_hash.txt
+.Ve
+.TP
+can be defined, allowing the script to import alternate default values for the following options:
+.Sp
+.Vb 1
+\&default_algorithm
+\&md5
+\&sha1
+\&sha256
+\&sha512
+\&xxh32
+\&xxh64
+\&xxh128
+\&crc32
+\&confirmation
+.Ve
+.SS LOG FILES
+.TP 4
+Temporary log files are stored at
+.Sp
+.Vb 1
+\&/tmp/AVpres/name_hash.XXXXXXXXXX
+.Ve
+.TP
+The log files can be used for debugging, for example by running \fBcat\fR on the address prompted with fatal error messages:
+.Sp
+.Vb 1
+\&cat /tmp/AVpres/name_hash.XXXXXXXXXX
+.Ve
+.SH SEE ALSO
+.TP 4
+Yann Collet: "xxHash fast digest algorithm", version 0.1.1, 2018-10-10
+.br
+https://github.com/Cyan4973/xxHash/blob/dev/doc/xxhash_spec.md
+.TP
+\fBRFC 1321\fR, "The MD5 Message-Digest Algorithm", April 1992
+.br
+https://www.rfc-editor.org/info/rfc1321
+.TP
+\fBRFC 3174\fR, "US Secure Hash Algorithm (SHA1)", September 2001
+.br
+https://www.rfc-editor.org/info/rfc3174
+.TP
+"Descriptions of SHA-256, SHA-384, and SHA-512"
+.br
+https://web.archive.org/web/20130526224224/http://csrc.nist.gov/
+.br
+groups/STM/cavp/documents/shs/sha256-384-512.pdf
+.TP
+\fBxxhsum\fR(1), \fBmd5sum\fR(1), \fBsha1sum\fR(1), \fBsha256sum\fR(1) and \fBsha512sum\fR(1).
+.SH COPYRIGHT
+Copyright (c) 2014-2023 by Reto Kromer
+.SH LICENSE
+The \fBname_hash\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBname_hash\fR Bash script is provided "as is" without warranty or support of any kind.

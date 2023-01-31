@@ -1,0 +1,319 @@
+#!/usr/bin/env bash
+
+# Install, delete, list or print 'FFCommand Engine' presets on macOS and
+# Windows Terminal and Subsystem for Linux, including the 'AVpres' and
+# 'ffmprovisr' presets.
+#
+# Copyright (c) 2019-2023 by Reto Kromer <https://reto.ch>
+#
+# This Bash script is released under a 3-Clause BSD License and is provided
+# "as is" without warranty or support of any kind.
+
+
+# initialise constants
+VERSION='2022-12-31'
+SCRIPT_NAME="$(basename "$0")"
+CONFIG_FILE="${HOME}/.config/AVpres/Bash_AVpres/${SCRIPT_NAME}.txt"
+RED='\033[1;31m'
+BLUE='\033[1;34m'
+NC='\033[0m'
+
+# load configuration file if any and initialise default values
+unset label
+[[ -f "${CONFIG_FILE}" ]] && . "${CONFIG_FILE}"
+confirmation="${confirmation:-yes}"
+
+# initialise another default value
+preset_regex='^(AVpres|ffmprovisr)$'
+
+# initialise variables
+unset mode
+unset output_file
+unset preset
+
+
+# get date-and-time stamp
+date_time() {
+  TZ='UTC' date +'[%F %T %Z]'
+}
+
+
+# start log file
+[[ -d '/tmp/AVpres' ]] || mkdir -p '/tmp/AVpres'
+LOG_FILE="$(mktemp "/tmp/AVpres/${SCRIPT_NAME}.XXXXXXXXXX")"
+echo "$(date_time) ${SCRIPT_NAME} ${VERSION}" > "${LOG_FILE}"
+echo "$(date_time) $0 $*" >> "${LOG_FILE}"
+echo "$(date_time) START" >> "${LOG_FILE}"
+
+# check that Bash 3.2 or later is running
+if ! printf '%s\n%s\n' "$(bash -c 'echo ${BASH_VERSION}')" "3.2" | sort -rVC; then
+  echo -e "${BLUE}Warning: This 'bash' binary is very old. Tested for version 3.2 or later.${NC}"
+fi
+
+
+# print an error message and exit with status 1
+abort() {
+  echo -e "${RED}${1:-An unknown error occurred.\a}${NC}"
+  echo "$(date_time) ${1:-An unknown error occurred.}" >> "${LOG_FILE}"
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 1
+}
+
+
+# initialise another default value
+if [[ "$(uname -s)" == 'Darwin' ]]; then
+  PRESET_PATH="${HOME}/Library/Application Support/FFCommand_Engine/Presets"
+elif [[ "$(uname -s)" == 'Linux' ]]; then
+  if [[ -d '/mnt/c/Program Files (x86)' ]]; then
+    if [[ ! -d '/mnt/c/Program Files (x86)/FFCommand_Engine/Presets' ]]; then
+      abort "Error: The installation on Windows seems not to be complete."
+    else
+      PRESET_PATH='/mnt/c/Program Files (x86)/FFCommand_Engine/Presets'
+    fi
+  fi
+else
+  abort "Sorry, the operating system '$(uname -s)' is not supported."
+fi
+
+
+# print a minimal help message and exit with status 0
+print_prompt() {
+  echo "$(date_time) print prompt" >> "${LOG_FILE}"
+  cat << EOF
+Help:
+  ${SCRIPT_NAME} -h
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# print the help message and exit with status 0
+print_help() {
+  echo "$(date_time) print help" >> "${LOG_FILE}"
+  cat << EOF
+
+Usage:
+  ${SCRIPT_NAME} -l | (-i|-d|-p) [<preset>]
+  ${SCRIPT_NAME} -h | -x
+Options:
+  -l  list the installed presets
+  -i  install 'AVpres', 'ffmprovisr' or any other preset
+  -d  delete a preset
+  -p  print a preset
+  -h  this help
+  -x  advanced options with their default arguments
+Dependencies:
+  curl (only for 'AVpres' and 'ffmprovisr')
+See also:
+  man ${SCRIPT_NAME}
+  https://avpres.net/Bash_AVpres/
+About:
+  Abstract: Install, delete, list or print 'FFCommand Engine' recipe presets
+  Version:  ${VERSION}
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# print advanced options with their default arguments and exit with status 0
+print_options() {
+  echo "$(date_time) print options" >> "${LOG_FILE}"
+  cat << EOF
+
+Advanced options with their default arguments:
+  --confirmation='${confirmation}'
+  --label='${label}'
+
+EOF
+  echo "$(date_time) END" >> "${LOG_FILE}"
+  exit 0
+}
+
+
+# install a new preset or replace an existing one
+install_preset() {
+  local kbd
+  local tmp_data
+
+  if [[ ! "${preset}" ]]; then
+    echo -en "${BLUE}Preset file: ${NC}"
+    read -r preset
+    if [[ $(echo "${preset}" | grep -E "${preset_regex}") ]]; then
+      true
+    elif [[ ! -f "${preset}" ]]; then
+      abort "Error: '${preset}' is not a file."
+    fi
+  fi
+  if [[ ! "${label}" ]]; then
+    label="${preset##*/}"
+    label="${label%.*}"
+  fi
+
+  # check label
+  if [[ -z "${label}" || "${label//[A-Za-z0-9_-]/}" ]]; then
+    abort "Error: The label '${label}' is not valid."
+  fi
+
+  # check that 'curl' is running
+  if [[ $(echo "${preset}" | grep -E "${preset_regex}") ]]; then
+    if ! command -v curl &> /dev/null; then
+      abort "Error: 'curl' is failing."
+    fi
+  fi
+
+  if [[ "${confirmation}" != 'no' ]]; then
+    if [[ -f "${PRESET_PATH}/${label}.txt" ]]; then
+      echo -en "${BLUE}Warning: Preset '${label}' already exists. Replace it (y|N)? ${NC}"
+    else
+      echo -en "${BLUE}Install '${label}' (y|N)? ${NC}"
+    fi
+    read -rn 1 kbd
+    echo
+    if [[ "${kbd}" != [Yy] ]]; then
+      abort "Aborted by user."
+    fi
+  fi
+
+  if [[ "${preset}" == 'AVpres' ]]; then
+    tmp_data=$(curl https://avpres.net/FFmpeg/recipes.txt -s) > /dev/null
+  elif [[ "${preset}" == 'ffmprovisr' ]]; then
+    tmp_data=$(curl https://raw.githubusercontent.com/amiaopensource/ffmprovisr/gh-pages/recipes.txt -s) > /dev/null
+  else
+    tmp_data="$(cat "${preset}")"
+  fi
+  if echo "${tmp_data}" > "${PRESET_PATH}/${label}.txt"; then
+    echo -e "${BLUE}Preset '${label}' has been successfully installed.${NC}"
+    echo "  ${preset}" >> "${LOG_FILE}"
+  else
+    abort "Error: Could not install preset '${label}'."
+  fi
+
+  return 0
+}
+
+
+# delete a preset
+delete_preset() {
+  local kbd
+
+  cd "${PRESET_PATH}" || abort "Error: Could not change directory to '${PRESET_PATH}'."
+
+  if [[ ! "${preset}" ]]; then
+    echo "Installed 'FFCommand_Engine' presets:"
+    find . -type f | sort | sed 's/.txt//' | sed 's/^.\//  /'
+    echo -en "${BLUE}Preset to delete: ${NC}"
+    read -r preset
+    if [[ ! "${preset}" ]]; then
+      abort "Error: No preset is chosen."
+    fi
+  fi
+  if [[ ! -f "${PRESET_PATH}/${preset%.txt}.txt" ]]; then
+    abort "Error: Preset '${preset}' doesn't exist."
+  fi
+
+  if [[ "${confirmation}" != 'no' ]]; then
+    echo -en "${BLUE}Delete '${preset%.txt}' from 'FFCommand_Engine' (y|N)? ${NC}"
+    read -rn 1 kbd
+    echo
+    if [[ "${kbd}" != [Yy] ]]; then
+      abort "Aborted by user."
+    fi
+  fi
+
+  if rm "${PRESET_PATH}/${preset%.txt}.txt"; then
+    echo -e "${BLUE}The preset '${preset}' has been successfully deleted.${NC}"
+    echo "  ${preset}" >> "${LOG_FILE}"
+  else
+    abort "Error: Could not delete the '${preset}' preset."
+  fi
+
+  return 0
+}
+
+
+# list the installed presets
+list_preset() {
+  cd "${PRESET_PATH}" || abort "Error: Could not change directory to '${PRESET_PATH}'."
+  echo "Installed 'FFCommand_Engine' presets:"
+  find . -type f | sort | sed 's/.txt//' | sed 's/^.\//  /' | tee -a "${LOG_FILE}"
+
+  return 0
+}
+
+
+# print a preset
+print_preset() {
+  local kbd
+  local working_dir
+
+  working_dir="${PWD}"
+  cd "${PRESET_PATH}" || abort "Error: Could not change directory to '${PRESET_PATH}'."
+
+  if [[ ! "${preset}" ]]; then
+    echo "Installed 'FFCommand_Engine' presets:"
+    find . -type f | sort | sed 's/.txt//' | sed 's/^.\//  /'
+    echo -en "${BLUE}Preset to print: ${NC}"
+    read -r preset
+    if [[ ! "${preset}" ]]; then
+      abort "Error: No preset is chosen."
+    fi
+  fi
+  if [[ ! -f "${PRESET_PATH}/${preset%.txt}.txt" ]]; then
+    abort "Error: Preset '${preset}' doesn't exist."
+  fi
+  cd "${working_dir}" || abort "Error: Could not change directory to '${working_dir}'."
+
+  if [[ "${output_file}" != '' ]]; then
+    if [[ ! -d "$(dirname "${output_file}")" ]]; then
+      output_file="${HOME}/Desktop/${preset%.txt}.txt"
+    fi
+    cat "${PRESET_PATH}/${preset%.txt}.txt" > "${output_file}"
+  else
+    cat "${PRESET_PATH}/${preset%.txt}.txt"
+  fi
+  echo "  ${preset}" >> "${LOG_FILE}"
+
+  return 0
+}
+
+
+# parse the provided input
+if (( $# == 0 )); then
+  print_prompt
+else
+  while true; do
+    case "${1}" in
+      -h|--help) print_help ;;
+      -x|--options) print_options ;;
+      -i|--install) mode='install'
+        if [[ "${2}" ]]; then preset="${2}"; shift; fi ;;
+      -d|--delete) mode='delete'
+        if [[ "${2}" ]]; then preset="${2}"; shift; fi ;;
+      -l|--list) mode='list' ;;
+      -p|--print) mode='print'
+        if [[ "${2}" ]]; then preset="${2}"; shift; fi ;;
+      --install=?*) mode='install'; preset="${1#*=}" ;;
+      --delete=?*) mode='delete'; preset="${1#*=}" ;;
+      --print=?*) mode='print'; preset="${1#*=}" ;;
+      --label=?*) label="${1#*=}" ;;
+      --confirmation=?*) confirmation="${1#*=}" ;;
+      --output_file=?*) output_file="${1#*=}" ;;
+      --) shift; break ;;
+      -?*) abort "Error: The option '${1}' is not valid." ;;
+      *) break
+    esac
+    shift
+  done
+fi
+
+# process input
+if [[ "${mode}" =~ ^(install|delete|list|print)$ ]]; then
+  echo "$(date_time) ${mode} preset" >> "${LOG_FILE}"
+  ${mode}_preset
+  echo "$(date_time) END" >> "${LOG_FILE}"
+else
+  abort "Error: No valid option passed."
+fi

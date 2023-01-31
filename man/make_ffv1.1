@@ -1,0 +1,201 @@
+.TH "make_ffv1" "1" "https://avpres.net/Bash_AVpres/" "2022-12-31" "Bash Scripts for AVpres"
+.
+.\" turn off justification for nroff
+.if n .ad l
+.\" turn off hyphenation
+.nh
+.
+.de Sp \" vertical space (when .PP is not used)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" end verbatim text
+.ft R
+.fi
+..
+.SH NAME
+make_ffv1 - Generate a Matroska/FFV1 file
+.SH SYNOPSIS
+\fBmake_ffv1 -i \fIinput_path\fB -o \fIoutput_file
+.LP
+\fBmake_ffv1 -h\fR | \fB-x
+.SH DESCRIPTION
+\fBBash AVpres\fR is a collection of Bash scripts for audio-visual preservation. One of these small programs is \fBmake_ffv1\fR. It encodes a video file or a folder containing single images into an FFV1 stream and muxes it into a Matroska container (".mkv" file). If a sound stream is present, then by default it is copied without any re-encoding.
+.PP
+Bash version 3.2 or later is strongly recommended. We advise to use the current version 5.2.
+.SH OPTIONS
+.SS BASIC OPTIONS
+.TP 4
+\fB-i \fIinput_path\fB, --input=\fIinput_path
+\fIinput_path\fR is a file if the content is stream based, or a folder if the content is single-image based
+.Sp
+When a folder is passed, the script extracts the regular expressions ("regex") for processing all the files and determines the actual number of the first frame. The naming must follow one of the two formats:
+.Sp
+.Vb 1
+\&    path/to/filename_digits.extension
+\&    path/to/digits.extension
+.Ve
+.Sp
+where \fIdigits\fR is the numbering, which must be either alone or at the end of the filename, divided by an underscore from the rest of the filename and by a period from the extension (the filename can contain other underscore signs). The numbering can start at any number, but all successive frames must be present, from the beginning to the end of the interval. This can be verified by using the \fBmissing_files\fR script.
+.TP
+\fB-o \fIoutput_file\fB, --output=\fIoutput_file
+output file
+.SS ADVANCED OPTIONS
+.TP 4
+The default arguments of the advanced options can be overwritten by the user. Please remember that any string containing spaces must be quoted, or its spaces must be escaped. To cancel a default argument use:
+.Sp
+.Vb 1
+\&--<option>='#'
+.Ve
+.TP
+.B --ffmpeg='/bin/ffmpeg'
+path to the \fBffmpeg\fR command
+.TP
+.B --ffprobe='/bin/ffprobe'
+path to the \fBffprobe\fR command
+.TP
+.B --ff_glo_opt='-y'
+A possibly already existing output file is overwritten.
+.TP
+The following two input file default parameters are used only when single-image-based content is provided:
+.TP
+.B --f='image2'
+Probably this parameter should never be modified. It forces the use of the image file demuxer for the input.
+.TP
+\fB--framerate=\fIframerate
+The default frame rate for video is \fI25\fR. The standardised projection speed for sound films is \fI24\fR frames per second, which is the default value in \fBmake_ffv1\fR. Silent films or amateur films have often a different projection speed, for example \fI18\fR.
+.TP
+Video codec options with their default parameters:
+.TP
+.B --c_v='ffv1'
+video codec
+.TP
+.B --level='3'
+Select version 3 of FFV1, which is the default in recent FFmpeg versions. Valid values are \fI0\fR, \fI1\fR and \fI3\fR.
+.TP
+.B --coder='1'
+Select the range coder. Possible values are:
+.Sp
+.Vb 1
+\&    0 = Golomb-Rice coder
+\&    1 = range coder with the default state transition table
+\&    2 = range coder with a custom state transition table
+.Ve
+.Sp
+Please do not use this option, unless you know exactly what you are doing.
+.TP
+.B --threads=''
+A positive integer gives the numbers of threads to use while processing. Adjust this to match how many of the available CPU cores you want to use. We advise to use a very small multiple of the number of cores. You can see the actual default value of a specific computer by running:
+.Sp
+.Vb 1
+\&    make_ffv1 -x
+.Ve
+.TP
+.B --context='1'
+Select the large context.
+.TP
+.B --g='1'
+Select the group of pictures (GOP) size. For archival use this should always be set to \fI1\fR.
+.TP
+.B --slices=''
+Each frame is split into a number of slices. This affects multithreating performance as well as filesize: increasing the number of slices may speed up performance, but also increases the filesize. We advise to use the number of threads multiplied by a small power of two. The possible range spans from 4 to 1023, but sadly not all values are valid. If an invalid value is chosen, then the nearest smaller one is used. You can see the actual default value of a specific computer by running:
+.Sp
+.Vb 1
+\&    make_ffv1 -x
+.Ve
+.TP
+.B --slicecrc='1'
+Enabling this option adds CRC information to each slice (\fI0\fR = off, \fI1\fR = on). This makes it possible for a decoder to detect errors in the bitstream, rather than blindly decoding a broken slice.
+.TP
+.B --filter_v=''
+This can be used, for example, to provide scaling and/or padding video filters.
+.TP
+Audio codec options with their default parameters:
+.TP
+.B --c_a='copy'
+If no sound stream is present, then the \fBffmpeg\fR parameter '-an' is used instead.
+.TP
+.B --filter_a=''
+This can be used to provide audio filters.
+.TP
+Output file default parameters:
+.TP
+.B --suffix='_ffv1'
+The suffix is inserted at the end of the filename, immediately before the period and the extension. Note that a preceding underscore, if wished, must be added.
+.TP
+.B --extension='mkv'
+Matroska is the "natural" container for the FFV1 video codec, but others are possible.
+.SS INFORMATIVE OPTIONS
+.TP 4
+.B -h, --help
+display a help message
+.TP
+.B -x, --options
+display the advanced options with their default arguments
+.SH NOTES
+The Audio Video Interleave container ('.avi' files) is also supported by \fBmake_ffv1\fR and \fBverify_ffv1\fR.
+.SS CONFIGURATION FILE
+.TP 4
+An external configuration file
+.Sp
+.Vb 1
+\&${HOME}/.config/AVpres/Bash_AVpres/make_ffv1.txt
+.Ve
+.TP
+can be defined, allowing the script to import alternate default values for the following options:
+.Sp
+.Vb 1
+\&ffmpeg_bin
+\&ffprobe_bin
+\&ff_glo_opt
+\&f
+\&framerate
+\&filter_v
+\&c_v
+\&level
+\&coder
+\&context
+\&g
+\&slicecrc
+\&filter_a
+\&c_a
+\&suffix
+\&extension
+.Ve
+.SS LOG FILES
+.TP 4
+Temporary log files are stored at
+.Sp
+.Vb 1
+\&/tmp/AVpres/make_ffv1.XXXXXXXXXX
+.Ve
+.TP
+The log files can be used for debugging, for example by running \fBcat\fR on the address prompted with fatal error messages:
+.Sp
+.Vb 1
+\&cat /tmp/AVpres/make_ffv1.XXXXXXXXXX
+.Ve
+.SH SEE ALSO
+.TP 4
+FFmpeg Cookbook for Archivists, entry "Video into FFV1"
+.br
+https://avpres.net/FFmpeg/im_FFV1
+.TP
+FFmpeg Cookbook for Archivists, entry "Image sequence into FFV1"
+.br
+https://avpres.net/FFmpeg/sq_FFV1
+.TP
+\fBverify_ffv1\fR(1).
+.TP
+\fBffmpeg\fR(1) and \fBffprobe\fR(1).
+.SH COPYRIGHT
+Copyright (c) 2012-2023 by Reto Kromer
+.SH LICENSE
+The \fBmake_ffv1\fR Bash script is released under a 3-Clause BSD License.
+.SH DISCLAIMER
+The \fBmake_ffv1\fR Bash script is provided "as is" without warranty or support of any kind.
