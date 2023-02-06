@@ -257,16 +257,18 @@ remove_checksum() {
     if echo "${in_file}" \
       | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." &> /dev/null
     then
-      checksum="$(echo "${in_file}" \
-        | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." \
-        | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}")"
-      new_file="${in_file/"$checksum"/}"
+      # checksum="$(echo "${in_file}" \
+      #   | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." \
+      #   | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}")"
+      # new_file="${in_file/"$checksum"/}"
       new_filename="$(echo ${in_file} | rev | cut -d'_' -f3- | rev)"
+      new_fileext="$(echo ${in_file} | rev | cut -d"." -f1  | rev)"
       echo $new_filename
-      if ! mv "${in_file}" "${new_file}"; then
+      echo $new_fileext
+      if ! mv "${in_file}" "${new_filename}.${new_fileext}"; then
         abort "Fatal error, see '${LOG_FILE}'."
       fi
-      echo "$(date_time) $(basename "${new_file}")" >> "${LOG_FILE}"
+      echo "$(date_time) $(basename "${new_filename}")" >> "${LOG_FILE}"
       echo "$(basename "${new_file}")"
       return 0
     fi
