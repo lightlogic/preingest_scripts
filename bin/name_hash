@@ -164,7 +164,6 @@ check_algorithm() {
 add_checksum() {
   local in_file="${1}"
   local new_file
-
   if [[ ! "${algorithm}" ]]; then
     algorithm="${default_algorithm}"
   fi
@@ -251,13 +250,9 @@ remove_checksum() {
   local algo
   local checksum
   local new_file
-
+  local new_filename
   for algo in {xxh128,sha1,sha256,sha512,xxh32,xxh64}; do
     hash_length=$(${!algo} <(echo) | awk '{print $1}' | awk '{print length}')
-    echo $hash_length
-    algo_lenght=${#algo}
-    full_lenght=`expr $algo_lenght + $hash_lenght`
-    echo $full_lenght
     (( $? != 0 )) && abort "Fatal error, see '${LOG_FILE}'."
     if echo "${in_file}" \
       | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." &> /dev/null
@@ -265,8 +260,9 @@ remove_checksum() {
       checksum="$(echo "${in_file}" \
         | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." \
         | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}")"
-      echo $checksum
-      new_file="${in_file/"$algo_$checksum"/}"
+      new_file="${in_file/"$checksum"/}"
+      new_filename="$(echo ${in_file} | rev | cut -d'_' -f3- | rev)"
+      echo $new_filename
       if ! mv "${in_file}" "${new_file}"; then
         abort "Fatal error, see '${LOG_FILE}'."
       fi
