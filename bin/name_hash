@@ -170,6 +170,7 @@ add_checksum() {
   check_algorithm "${algorithm}"
   checksum=$(${!algorithm} "${in_file}" | awk '{print $1}')
   (( $? != 0 )) && abort "Fatal error, see '${LOG_FILE}'."
+## CHANGE: adding algorithm name to filename
   new_file="${in_file%.*}_${algorithm}_${checksum}.${in_file##*.}"
   if ! mv "${in_file}" "${new_file}"; then
     abort "Fatal error, see '${LOG_FILE}'."
@@ -250,25 +251,23 @@ remove_checksum() {
   local algo
   local checksum
   local new_file
-  local new_filename
   for algo in {xxh128,sha1,sha256,sha512,xxh32,xxh64}; do
     hash_length=$(${!algo} <(echo) | awk '{print $1}' | awk '{print length}')
     (( $? != 0 )) && abort "Fatal error, see '${LOG_FILE}'."
     if echo "${in_file}" \
       | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." &> /dev/null
     then
+
       # checksum="$(echo "${in_file}" \
       #   | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}\." \
       #   | grep -oE "\_[0-9A-Fa-f]{"${hash_length}"}")"
       # new_file="${in_file/"$checksum"/}"
-      new_filename="$(echo ${in_file} | rev | cut -d'_' -f3- | rev)"
-      new_fileext="$(echo ${in_file} | rev | cut -d"." -f1  | rev)"
-      echo $new_filename
-      echo $new_fileext
-      if ! mv "${in_file}" "${new_filename}.${new_fileext}"; then
+##CHANGE: removing algorithm name as well as checksum from filename
+      new_file="$(echo ${in_file} | rev | cut -d'_' -f3- | rev)"."$(echo ${in_file} | rev | cut -d"." -f1  | rev)"
+      if ! mv "${in_file}" "${new_file}"; then
         abort "Fatal error, see '${LOG_FILE}'."
       fi
-      echo "$(date_time) $(basename "${new_filename}")" >> "${LOG_FILE}"
+      echo "$(date_time) $(basename "${new_file}")" >> "${LOG_FILE}"
       echo "$(basename "${new_file}")"
       return 0
     fi
